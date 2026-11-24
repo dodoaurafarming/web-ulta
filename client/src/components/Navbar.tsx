@@ -2,7 +2,9 @@ import {
   Crown,
   FlaskConical,
   Gamepad2,
+  LogOut,
   RefreshCw,
+  ScrollText,
   Trophy,
   Wifi,
   WifiOff,
@@ -13,35 +15,39 @@ interface NavbarProps {
   connectionStatus: ConnectionStatus;
   mockMode: boolean;
   activeView: 'game' | 'leaderboard';
+  compactArena?: boolean;
   roomCode?: string;
   onToggleMockMode: (enabled: boolean) => void;
   onReconnect: () => void;
   onChangeView: (view: 'game' | 'leaderboard') => void;
+  onLeaveRoom?: () => void;
+  onToggleMobileDrawer?: () => void;
+  logCount?: number;
 }
 
-const STATUS_STYLE: Record<
+const STATUS_META: Record<
   ConnectionStatus,
-  { label: string; dot: string; badge: string }
+  { label: string; dot: string; tone: string }
 > = {
   connected: {
-    label: 'Connected',
-    dot: 'bg-[#2F7D57]',
-    badge: 'bg-[#E6F2EB] text-[#1D5439] border-[#BBDAC8]',
+    label: 'Terhubung',
+    dot: 'bg-[#266D4B]',
+    tone: 'text-[#1D5439] bg-[#E6F2EB] border-[#BBDAC8]',
   },
   connecting: {
-    label: 'Connecting',
-    dot: 'bg-[#C4881A] animate-pulse',
-    badge: 'bg-[#FDF3D7] text-[#7D530B] border-[#E7CB82]',
+    label: 'Menghubungkan',
+    dot: 'bg-[#C0831F] animate-pulse',
+    tone: 'text-[#7D530B] bg-[#FDF3D7] border-[#E7CB82]',
   },
   reconnecting: {
-    label: 'Reconnecting',
-    dot: 'bg-[#C4881A] animate-pulse',
-    badge: 'bg-[#FDF3D7] text-[#7D530B] border-[#E7CB82]',
+    label: 'Menyambung ulang',
+    dot: 'bg-[#C0831F] animate-pulse',
+    tone: 'text-[#7D530B] bg-[#FDF3D7] border-[#E7CB82]',
   },
   disconnected: {
-    label: 'Disconnected',
-    dot: 'bg-[#C8523B]',
-    badge: 'bg-[#FCEBE7] text-[#8F2F1E] border-[#ECC1B7]',
+    label: 'Terputus',
+    dot: 'bg-[#C44B34]',
+    tone: 'text-[#8F2F1E] bg-[#FCEBE7] border-[#ECC1B7]',
   },
 };
 
@@ -49,62 +55,73 @@ export function Navbar({
   connectionStatus,
   mockMode,
   activeView,
+  compactArena = false,
   roomCode,
   onToggleMockMode,
   onReconnect,
   onChangeView,
+  onLeaveRoom,
+  onToggleMobileDrawer,
+  logCount = 0,
 }: NavbarProps) {
-  const statusMeta = STATUS_STYLE[connectionStatus];
+  const status = STATUS_META[connectionStatus];
 
   return (
-    <header className="sticky top-0 z-40 border-b-[1.5px] border-[#DDD2C0] bg-[#FFFDF8]">
-      <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2.5 px-3 py-2.5 sm:px-6">
-        {/* Brand Emblem */}
-        <button
-          type="button"
-          onClick={() => onChangeView('game')}
-          className="flex items-center gap-2.5 text-left group cursor-pointer"
-        >
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl border-[1.5px] border-[#963826] bg-[#C8523B] text-[#FFFDF8] shadow-[0_2px_0_0_#963826] group-hover:bg-[#B84731] transition-colors">
-            <Crown className="h-4.5 w-4.5" />
-          </div>
-          <div>
-            <div className="flex items-center gap-1.5">
-              <span className="font-display text-lg font-extrabold leading-none text-[#1F1B17]">
-                ULTA
-              </span>
-              <span className="rounded border border-[#D9CEBC] bg-[#F3ECE0] px-1.5 py-0.5 font-code text-[10px] font-bold text-[#645A4E]">
-                1.0
-              </span>
-              {roomCode && (
-                <span className="hidden sm:inline-block rounded border border-[#E5C068] bg-[#FDF3D7] px-1.5 py-0.5 font-code text-[10px] font-bold text-[#7D530B]">
-                  {roomCode}
-                </span>
-              )}
-            </div>
-            <p className="text-[11px] font-medium text-[#645A4E] leading-tight">
-              Ular Tangga Tabletop
-            </p>
-          </div>
-        </button>
+    <header
+      className={`shrink-0 z-40 border-b border-[#D5C7B2] bg-[#FFFDF8] ${
+        compactArena ? 'h-11 sm:h-12' : 'sticky top-0'
+      }`}
+    >
+      <div
+        className={`mx-auto flex h-full max-w-[1440px] items-center justify-between gap-2 px-3 sm:px-5 ${
+          compactArena ? 'py-1' : 'py-2.5'
+        }`}
+      >
+        {/* Brand */}
+        <div className="flex items-center gap-2 min-w-0">
+          <button
+            type="button"
+            onClick={() => onChangeView('game')}
+            className="flex items-center gap-2 text-left group cursor-pointer shrink-0"
+          >
+            <span
+              className={`flex items-center justify-center rounded-lg border border-[#8A2E1D] bg-[#C44B34] text-[#FFFDF8] shadow-[0_2px_0_0_#8A2E1D] group-hover:bg-[#B2412B] transition-colors ${
+                compactArena ? 'h-7 w-7' : 'h-8.5 w-8.5'
+              }`}
+            >
+              <Crown className={compactArena ? 'h-3.5 w-3.5' : 'h-4 w-4'} />
+            </span>
+            <span className="font-display text-base font-extrabold tracking-tight text-[#1F1A15] sm:text-lg">
+              ULTA
+            </span>
+          </button>
 
-        {/* Controls */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Mode Switch: Live WS vs Mock */}
+          {roomCode && (
+            <span className="rounded-md border border-[#E5C068] bg-[#FDF3D7] px-2 py-0.5 font-code text-[11px] font-bold text-[#7D530B]">
+              {roomCode}
+            </span>
+          )}
+        </div>
+
+        {/* Right Controls */}
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* Switch Live WS / Mock (disembunyikan di mobile arena agar top bar super ringkas) */}
           <div
-            className="inline-flex items-center rounded-lg border border-[#D9CEBC] bg-[#F3ECE0] p-0.5 text-xs font-semibold"
+            className={`${
+              compactArena ? 'hidden md:inline-flex' : 'inline-flex'
+            } items-center rounded-lg border border-[#D5C7B2] bg-[#EFE6D6] p-0.5 text-xs font-semibold`}
             role="group"
             aria-label="Mode koneksi"
           >
             <button
               type="button"
               onClick={() => onToggleMockMode(false)}
-              className={`flex items-center gap-1 rounded-md px-2.5 py-1 transition-colors cursor-pointer ${
+              className={`flex items-center gap-1 rounded-md px-2 py-1 transition-colors cursor-pointer ${
                 !mockMode
-                  ? 'bg-[#FFFDF8] text-[#1F1B17] shadow-[0_1px_0_0_#D9CEBC]'
-                  : 'text-[#645A4E] hover:text-[#1F1B17]'
+                  ? 'bg-[#FFFDF8] text-[#1F1A15] shadow-[0_1px_0_0_#D5C7B2]'
+                  : 'text-[#605549] hover:text-[#1F1A15]'
               }`}
-              title="Terhubung ke WebSocket Bridge VPS"
+              title="WebSocket Bridge VPS"
             >
               <Wifi className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Live WS</span>
@@ -112,58 +129,76 @@ export function Navbar({
             <button
               type="button"
               onClick={() => onToggleMockMode(true)}
-              className={`flex items-center gap-1 rounded-md px-2.5 py-1 transition-colors cursor-pointer ${
+              className={`flex items-center gap-1 rounded-md px-2 py-1 transition-colors cursor-pointer ${
                 mockMode
-                  ? 'bg-[#2C2621] text-[#FFFDF8]'
-                  : 'text-[#645A4E] hover:text-[#1F1B17]'
+                  ? 'bg-[#2A1E15] text-[#FFFDF8]'
+                  : 'text-[#605549] hover:text-[#1F1A15]'
               }`}
-              title="Simulasi lokal ULTA/1.0 tanpa server VPS"
+              title="Simulasi lokal ULTA/1.0"
             >
               <FlaskConical className="h-3.5 w-3.5" />
               <span>Mock</span>
             </button>
           </div>
 
-          {/* Connection Status + Reconnect */}
-          <div className="flex items-center gap-1.5">
-            <span
-              className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-semibold ${statusMeta.badge}`}
-            >
-              <span className={`h-2 w-2 rounded-full ${statusMeta.dot}`} />
-              <span className="hidden sm:inline">{statusMeta.label}</span>
-              {connectionStatus === 'disconnected' && (
-                <WifiOff className="h-3 w-3 sm:hidden" />
-              )}
+          {/* Status Koneksi */}
+          <span
+            className={`inline-flex items-center gap-1.5 rounded-lg border px-2 py-1 text-[11px] font-semibold ${status.tone}`}
+            title={`Status koneksi: ${status.label}`}
+          >
+            <span className={`h-2 w-2 rounded-full ${status.dot}`} />
+            <span className="hidden sm:inline">{status.label}</span>
+            {connectionStatus === 'disconnected' && (
+              <WifiOff className="h-3 w-3 sm:hidden" />
+            )}
+          </span>
+
+          {/* Reconnect */}
+          <button
+            type="button"
+            onClick={onReconnect}
+            title="Sambungkan ulang"
+            aria-label="Sambungkan ulang"
+            className="btn-tactile inline-flex items-center gap-1 rounded-lg border border-[#D5C7B2] bg-[#FFFDF8] px-2 py-1 text-xs font-semibold text-[#1F1A15] hover:bg-[#EFE6D6] cursor-pointer"
+          >
+            <RefreshCw
+              className={`h-3.5 w-3.5 ${
+                connectionStatus === 'connecting' ||
+                connectionStatus === 'reconnecting'
+                  ? 'animate-spin text-[#B7791F]'
+                  : 'text-[#605549]'
+              }`}
+            />
+            <span className={compactArena ? 'hidden xl:inline' : 'hidden md:inline'}>
+              Reconnect
             </span>
+          </button>
+
+          {/* Mobile Arena: tombol buka Log & Daftar Pemain */}
+          {compactArena && onToggleMobileDrawer && (
             <button
               type="button"
-              onClick={onReconnect}
-              title="Hubungkan ulang (Reconnect)"
-              aria-label="Reconnect ke server"
-              className="btn-tactile inline-flex items-center gap-1 rounded-lg border border-[#D9CEBC] bg-[#FFFDF8] px-2.5 py-1 text-xs font-semibold text-[#1F1B17] shadow-[0_2px_0_0_#E2D7C4] hover:bg-[#F3ECE0] cursor-pointer"
+              onClick={onToggleMobileDrawer}
+              className="btn-tactile lg:hidden inline-flex items-center gap-1 rounded-lg border border-[#D5C7B2] bg-[#EFE6D6] px-2 py-1 text-xs font-bold text-[#1F1A15] cursor-pointer"
+              aria-label="Buka posisi pemain dan log kejadian"
             >
-              <RefreshCw
-                className={`h-3.5 w-3.5 ${
-                  connectionStatus === 'connecting' ||
-                  connectionStatus === 'reconnecting'
-                    ? 'animate-spin text-[#B7791F]'
-                    : 'text-[#645A4E]'
-                }`}
-              />
-              <span className="hidden md:inline">Reconnect</span>
+              <ScrollText className="h-3.5 w-3.5 text-[#605549]" />
+              <span className="font-code text-[11px]">{logCount}</span>
             </button>
-          </div>
+          )}
 
-          {/* Leaderboard & History Navigation */}
+          {/* Leaderboard Nav (disembunyikan di mobile arena agar hemat ruang) */}
           <button
             type="button"
             onClick={() =>
               onChangeView(activeView === 'game' ? 'leaderboard' : 'game')
             }
-            className={`btn-tactile inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-bold cursor-pointer ${
+            className={`btn-tactile ${
+              compactArena ? 'hidden sm:inline-flex' : 'inline-flex'
+            } items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-bold cursor-pointer ${
               activeView === 'leaderboard'
-                ? 'border-[#1F1B17] bg-[#1F1B17] text-[#FFFDF8]'
-                : 'border-[#D9CEBC] bg-[#FFFDF8] text-[#1F1B17] shadow-[0_2px_0_0_#E2D7C4] hover:bg-[#F3ECE0]'
+                ? 'border-[#1F1A15] bg-[#1F1A15] text-[#FFFDF8]'
+                : 'border-[#D5C7B2] bg-[#FFFDF8] text-[#1F1A15] hover:bg-[#EFE6D6]'
             }`}
           >
             {activeView === 'leaderboard' ? (
@@ -174,11 +209,24 @@ export function Navbar({
             ) : (
               <>
                 <Trophy className="h-3.5 w-3.5 text-[#B7791F]" />
-                <span className="hidden sm:inline">Leaderboard & Riwayat</span>
-                <span className="sm:hidden">Ranking</span>
+                <span className="hidden md:inline">Leaderboard</span>
               </>
             )}
           </button>
+
+          {/* Keluar Room langsung di top bar Arena */}
+          {compactArena && onLeaveRoom && (
+            <button
+              type="button"
+              onClick={onLeaveRoom}
+              title="Keluar dari room"
+              aria-label="Keluar dari room"
+              className="btn-tactile inline-flex items-center gap-1 rounded-lg border border-[#ECC1B7] bg-[#FCEBE7] px-2 py-1 text-xs font-bold text-[#8F2F1E] hover:bg-[#F7DAD3] cursor-pointer"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Keluar</span>
+            </button>
+          )}
         </div>
       </div>
     </header>

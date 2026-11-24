@@ -1,13 +1,13 @@
-import { LogOut, Users } from 'lucide-react';
-import { DiceControlPanel } from '../components/DiceControlPanel';
+import { X } from 'lucide-react';
+import {
+  DesktopDiceSection,
+  MobileBottomCommandDock,
+  PlayerStandingsSection,
+} from '../components/DiceControlPanel';
 import { EventLogPanel } from '../components/EventLogPanel';
 import { GameBoard } from '../components/GameBoard';
-import { AnswerResultBanner } from '../components/QuestionModal';
-import type {
-  ActiveQuestionState,
-  ActiveTurnState,
-  ResolvedAnswerState,
-} from '../store/gameStore';
+import type { StageBanner } from '../hooks/usePresentationQueue';
+import type { ActiveTurnState } from '../store/gameStore';
 import type {
   BoardCell,
   GameLogEntry,
@@ -18,87 +18,149 @@ import type {
 interface GameArenaPageProps {
   room: RoomStateData | null;
   board: BoardCell[];
-  positions: Record<string, number>;
-  currentTurn: ActiveTurnState | null;
+  displayedPositions: Record<string, number>;
+  displayedTurn: ActiveTurnState | null;
+  displayedMove: MoveEvent | null;
+  displayedDice: number;
+  isDiceRolling: boolean;
+  hoppingPlayerId: string | null;
+  highlightedPathKey: string | null;
+  stageBanner: StageBanner | null;
   myPlayerId: string | null;
-  isMyTurn: boolean;
-  activeQuestion: ActiveQuestionState | null;
-  lastMove: MoveEvent | null;
-  lastAnswerResult: ResolvedAnswerState | null;
+  canRoll: boolean;
+  hasActiveQuestion: boolean;
+  isAnimating: boolean;
   logs: GameLogEntry[];
+  mobileDrawerOpen: boolean;
+  onCloseMobileDrawer: () => void;
   onRollDice: () => void;
-  onLeaveRoom: () => void;
 }
 
+/**
+ * Halaman Arena Tanpa Scroll (100dvh):
+ * - Desktop (>= 1024px): 2 kolom sejajar — Papan 10x10 dominan di kiri, Command Dock menempel di kanan
+ *   dengan log kejadian yang scroll mandiri di dalam kotaknya.
+ * - Mobile (< 1024px): Papan 10x10 utuh di tengah + Sticky Bottom Command Dock untuk lempar dadu
+ *   tanpa pernah perlu scroll, plus slide-up drawer untuk daftar pemain & log kejadian.
+ */
 export function GameArenaPage({
   room,
   board,
-  positions,
-  currentTurn,
+  displayedPositions,
+  displayedTurn,
+  displayedMove,
+  displayedDice,
+  isDiceRolling,
+  hoppingPlayerId,
+  highlightedPathKey,
+  stageBanner,
   myPlayerId,
-  isMyTurn,
-  activeQuestion,
-  lastMove,
-  lastAnswerResult,
+  canRoll,
+  hasActiveQuestion,
+  isAnimating,
   logs,
+  mobileDrawerOpen,
+  onCloseMobileDrawer,
   onRollDice,
-  onLeaveRoom,
 }: GameArenaPageProps) {
   const players = room?.players ?? [];
 
   return (
-    <div className="mx-auto max-w-7xl px-3 py-4 sm:px-6 sm:py-5">
-      {/* Bar Info Ringkas */}
-      <div className="surface-card mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl px-3.5 py-2">
-        <div className="flex items-center gap-3 text-xs font-semibold text-[#5A5045]">
-          <span className="rounded-md border border-[#E7CB82] bg-[#FDF3D7] px-2 py-0.5 font-code font-bold text-[#7D530B]">
-            ROOM {room?.roomCode ?? '------'}
-          </span>
-          <span className="inline-flex items-center gap-1">
-            <Users className="h-3.5 w-3.5 text-[#2F7D57]" />
-            {players.length} Pemain
-          </span>
-        </div>
-
-        <button
-          type="button"
-          onClick={onLeaveRoom}
-          className="inline-flex items-center gap-1 rounded-lg border border-[#ECC1B7] bg-[#FCEBE7] px-2.5 py-1 text-xs font-bold text-[#963826] hover:bg-[#F8DDD6] cursor-pointer"
-        >
-          <LogOut className="h-3.5 w-3.5" />
-          <span>Keluar</span>
-        </button>
-      </div>
-
-      {/* Hierarki Utama: Papan 10x10 Mendominasi (lg:col-span-8), Kontrol Ringkas (lg:col-span-4) */}
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-12 lg:items-start">
-        <div className="lg:col-span-8 space-y-3">
-          <AnswerResultBanner result={lastAnswerResult} players={players} />
+    <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
+      {/* Main Arena Viewport (strictly no page scroll) */}
+      <div className="mx-auto flex w-full max-w-[1440px] flex-1 min-h-0 flex-col lg:grid lg:grid-cols-[minmax(0,1fr)_350px] xl:grid-cols-[minmax(0,1fr)_380px] lg:gap-4 px-2 py-1.5 sm:px-4 sm:py-2.5 overflow-hidden">
+        {/* Kolom Utama: Papan 10x10 Dominan */}
+        <section className="flex flex-1 min-h-0 items-center justify-center overflow-hidden">
           <GameBoard
             board={board}
             players={players}
-            positions={positions}
-            currentTurnPlayerId={currentTurn?.playerId ?? null}
+            positions={displayedPositions}
+            currentTurnPlayerId={displayedTurn?.playerId ?? null}
             myPlayerId={myPlayerId}
-            lastMove={lastMove}
+            hoppingPlayerId={hoppingPlayerId}
+            highlightedPathKey={highlightedPathKey}
+            stageBanner={stageBanner}
           />
-        </div>
+        </section>
 
-        <aside className="lg:col-span-4 space-y-3.5">
-          <DiceControlPanel
+        {/* Desktop Command Dock (Kanan — satu panel studio terpadu, log scroll internal) */}
+        <aside className="studio-panel hidden lg:flex h-full min-h-0 flex-col overflow-hidden rounded-2xl">
+          <DesktopDiceSection
             players={players}
-            positions={positions}
-            currentTurn={currentTurn}
+            positions={displayedPositions}
+            currentTurn={displayedTurn}
             myPlayerId={myPlayerId}
-            isMyTurn={isMyTurn}
-            hasActiveQuestion={activeQuestion !== null}
-            lastMove={lastMove}
+            canRoll={canRoll}
+            isDiceRolling={isDiceRolling}
+            displayedDice={displayedDice}
+            displayedMove={displayedMove}
+            hasActiveQuestion={hasActiveQuestion}
+            isAnimating={isAnimating}
             onRollDice={onRollDice}
           />
 
-          <EventLogPanel logs={logs} />
+          <PlayerStandingsSection
+            players={players}
+            positions={displayedPositions}
+            currentTurnPlayerId={displayedTurn?.playerId ?? null}
+            myPlayerId={myPlayerId}
+          />
+
+          <EventLogPanel logs={logs} embedded />
         </aside>
       </div>
+
+      {/* Mobile Sticky Bottom Command Dock (< 1024px) */}
+      <MobileBottomCommandDock
+        players={players}
+        currentTurn={displayedTurn}
+        myPlayerId={myPlayerId}
+        canRoll={canRoll}
+        isDiceRolling={isDiceRolling}
+        displayedDice={displayedDice}
+        hasActiveQuestion={hasActiveQuestion}
+        isAnimating={isAnimating}
+        onRollDice={onRollDice}
+      />
+
+      {/* Mobile Slide-up Drawer untuk Posisi Pemain & Log Kejadian */}
+      {mobileDrawerOpen && (
+        <div
+          className="lg:hidden fixed inset-0 z-50 flex items-end bg-[#1F1A15]/55"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Pemain dan catatan permainan"
+          onClick={onCloseMobileDrawer}
+        >
+          <div
+            className="animate-popup-in flex max-h-[75dvh] w-full flex-col overflow-hidden rounded-t-2xl border-t-2 border-[#352517] bg-[#FFFDF8]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-[#DDD1BE] px-4 py-3">
+              <h2 className="font-display text-base font-extrabold text-[#1F1A15]">
+                Pemain & Catatan
+              </h2>
+              <button
+                type="button"
+                onClick={onCloseMobileDrawer}
+                aria-label="Tutup panel"
+                className="rounded-lg p-1 text-[#605549] hover:bg-[#EFE6D6]"
+              >
+                <X className="h-4.5 w-4.5" />
+              </button>
+            </div>
+            <PlayerStandingsSection
+              players={players}
+              positions={displayedPositions}
+              currentTurnPlayerId={displayedTurn?.playerId ?? null}
+              myPlayerId={myPlayerId}
+            />
+            <div className="flex flex-1 min-h-[180px] flex-col overflow-hidden">
+              <EventLogPanel logs={logs} embedded />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { ArrowLeft, Database, History, Trophy } from 'lucide-react';
+import { ArrowLeft, Database, Trophy } from 'lucide-react';
 
 interface LeaderboardPlaceholderProps {
   onBackToGame: () => void;
@@ -8,54 +8,51 @@ export function LeaderboardPlaceholder({
   onBackToGame,
 }: LeaderboardPlaceholderProps) {
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
-      <div className="surface-card rounded-2xl p-6 text-center sm:p-9 space-y-5">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border-2 border-[#E5C068] bg-[#FDF3D7] text-[#B7791F]">
-          <Trophy className="h-7 w-7" />
-        </div>
-
-        <div className="space-y-2">
-          <span className="inline-flex items-center gap-1.5 rounded-md border border-[#D9CEBC] bg-[#F3ECE0] px-3 py-1 text-xs font-bold text-[#5A5045]">
-            <Database className="h-3.5 w-3.5 text-[#2F7D57]" />
-            <span>Integrasi Prisma + TiDB Cloud — Tahap 5</span>
+    <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
+      <section className="studio-panel overflow-hidden rounded-2xl">
+        <div className="border-b border-[#352517] bg-[#2A1E15] px-6 py-5 text-[#FFFDF8] flex items-center gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-[#E5C068] bg-[#3A2B1F] text-[#F7E3AC]">
+            <Trophy className="h-5 w-5" />
           </span>
-          <h1 className="font-display text-2xl font-extrabold text-[#1F1B17] sm:text-3xl">
-            Leaderboard & Riwayat Pertandingan
-          </h1>
-          <p className="mx-auto max-w-lg text-sm font-medium text-[#645A4E] leading-relaxed">
-            Halaman ini akan menampilkan papan peringkat pemain (total main,
-            kemenangan, win rate, dan akurasi kuis IT) serta riwayat
-            pertandingan dari API <code>/api/leaderboard</code> dan{' '}
-            <code>/api/matches</code> pada Tahap 5.
+          <div>
+            <h1 className="font-display text-xl font-extrabold">
+              Leaderboard & Riwayat Pertandingan
+            </h1>
+            <p className="text-xs text-[#D4C7B4]">
+              Akan dihubungkan ke REST API Prisma + TiDB Cloud pada Tahap 5
+            </p>
+          </div>
+        </div>
+
+        <div className="p-6 space-y-5">
+          <p className="text-sm text-[#5A5045] leading-relaxed">
+            Halaman ini akan menampilkan peringkat kemenangan pemain, akurasi
+            kuis IT, serta daftar riwayat pertandingan terbaru dari endpoint{' '}
+            <code className="font-code text-xs bg-[#EFE6D6] px-1.5 py-0.5 rounded">
+              /api/leaderboard
+            </code>{' '}
+            dan{' '}
+            <code className="font-code text-xs bg-[#EFE6D6] px-1.5 py-0.5 rounded">
+              /api/matches
+            </code>
+            .
           </p>
-        </div>
 
-        <div className="mx-auto grid max-w-lg grid-cols-1 gap-3 text-left sm:grid-cols-2">
-          <div className="rounded-xl border border-[#E7CB82] bg-[#FDF4DC] p-3.5">
-            <Trophy className="h-4.5 w-4.5 text-[#B7791F] mb-1.5" />
-            <p className="text-xs font-bold text-[#1F1B17]">Top Leaderboard</p>
-            <p className="text-[11px] text-[#5A5045]">
-              Peringkat pemain & akurasi kuis IT
-            </p>
+          <div className="flex items-center gap-2 text-xs font-semibold text-[#1D5439]">
+            <Database className="h-4 w-4" />
+            <span>Skema database dan endpoint API sudah siap sejak Tahap 2.</span>
           </div>
-          <div className="rounded-xl border border-[#C6DFD0] bg-[#EBF5EF] p-3.5">
-            <History className="h-4.5 w-4.5 text-[#2F7D57] mb-1.5" />
-            <p className="text-xs font-bold text-[#1F1B17]">Riwayat Match</p>
-            <p className="text-[11px] text-[#5A5045]">
-              Kode room, peserta, & pemenang
-            </p>
-          </div>
-        </div>
 
-        <button
-          type="button"
-          onClick={onBackToGame}
-          className="btn-tactile inline-flex items-center gap-2 rounded-xl border-[1.5px] border-[#1F1B17] bg-[#1F1B17] px-5 py-2.5 text-sm font-bold text-[#FFFDF8] shadow-[0_3px_0_0_#4A3F35] hover:bg-[#332A22] cursor-pointer"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          <span>Kembali ke Permainan</span>
-        </button>
-      </div>
+          <button
+            type="button"
+            onClick={onBackToGame}
+            className="btn-tactile inline-flex items-center gap-2 rounded-xl border-2 border-[#1F1A15] bg-[#1F1A15] px-4 py-2.5 text-sm font-bold text-[#FFFDF8] shadow-[0_3px_0_0_#4A3E33] hover:bg-[#332A22] cursor-pointer"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span>Kembali ke Permainan</span>
+          </button>
+        </div>
+      </section>
     </div>
   );
 }

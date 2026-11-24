@@ -495,11 +495,12 @@ export class MockGameTransport implements GameTransport {
 
   constructor(config: MockTransportTimingConfig = {}) {
     this.timing = {
-      connectDelayMs: config.connectDelayMs ?? 180,
-      botJoinDelayMs: config.botJoinDelayMs ?? 450,
-      botTurnDelayMs: config.botTurnDelayMs ?? 900,
-      botAnswerDelayMs: config.botAnswerDelayMs ?? 1_400,
-      postMoveDelayMs: config.postMoveDelayMs ?? 250,
+      connectDelayMs: config.connectDelayMs ?? 220,
+      botJoinDelayMs: config.botJoinDelayMs ?? 600,
+      // Tempo santai seperti bermain dengan manusia sungguhan (1.2 - 1.8 detik)
+      botTurnDelayMs: config.botTurnDelayMs ?? 1_500,
+      botAnswerDelayMs: config.botAnswerDelayMs ?? 1_700,
+      postMoveDelayMs: config.postMoveDelayMs ?? 1_400,
       turnTimeoutMs: config.turnTimeoutMs ?? 10_000,
       questionTimeoutMs: config.questionTimeoutMs ?? 20_000,
       heartbeatIntervalMs: config.heartbeatIntervalMs ?? 7_000,
@@ -832,6 +833,12 @@ export class MockGameTransport implements GameTransport {
     });
 
     if (activePlayer.isBot) {
+      // Variasi jeda berpikir manusiawi ±20% (1.2s - 1.8s untuk default 1.5s)
+      const jitterFactor =
+        this.timing.botTurnDelayMs >= 500
+          ? 0.8 + this.rng() * 0.4
+          : 1;
+      const thinkMs = Math.round(this.timing.botTurnDelayMs * jitterFactor);
       this.schedule(() => {
         if (
           this.roomStatus === 'PLAYING' &&
@@ -840,7 +847,7 @@ export class MockGameTransport implements GameTransport {
         ) {
           this.executeRoll(activeId);
         }
-      }, this.timing.botTurnDelayMs);
+      }, thinkMs);
     } else {
       // Auto-roll jika waktu 10 detik habis (sesuai BLUEPRINT.md)
       this.turnDeadlineTimer = setTimeout(() => {
@@ -944,6 +951,11 @@ export class MockGameTransport implements GameTransport {
     });
 
     if (player.isBot) {
+      const jitterFactor =
+        this.timing.botAnswerDelayMs >= 500
+          ? 0.82 + this.rng() * 0.36
+          : 1;
+      const answerMs = Math.round(this.timing.botAnswerDelayMs * jitterFactor);
       this.schedule(() => {
         if (!this.pendingQuestion || this.pendingQuestion.playerId !== player.player_id) {
           return;
@@ -954,7 +966,7 @@ export class MockGameTransport implements GameTransport {
           ? q.answer
           : choices.find((c) => c !== q.answer) ?? 'A';
         this.resolveQuestion(chosen, false);
-      }, this.timing.botAnswerDelayMs);
+      }, answerMs);
     } else {
       this.questionDeadlineTimer = setTimeout(() => {
         if (this.pendingQuestion?.playerId === player.player_id) {

@@ -78,6 +78,7 @@ export function useGameSocket(hookOptions: UseGameSocketOptions = {}) {
   const quizStatsByPlayer = useGameStore((s) => s.quizStatsByPlayer);
   const gameOver = useGameStore((s) => s.gameOver);
   const startedAt = useGameStore((s) => s.startedAt);
+  const presentationEvents = useGameStore((s) => s.presentationEvents);
   const logs = useGameStore((s) => s.logs);
   const toasts = useGameStore((s) => s.toasts);
 
@@ -288,6 +289,7 @@ export function useGameSocket(hookOptions: UseGameSocketOptions = {}) {
     quizStatsByPlayer,
     gameOver,
     startedAt,
+    presentationEvents,
     logs,
     toasts,
     // Derived selectors

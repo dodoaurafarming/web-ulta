@@ -42,6 +42,11 @@ export interface PlayerQuizCounter {
   correct: number;
 }
 
+export interface QueuedPresentationEvent {
+  id: number;
+  event: ServerEvent;
+}
+
 export interface GameStoreState {
   connectionStatus: ConnectionStatus;
   mockMode: boolean;
@@ -64,6 +69,11 @@ export interface GameStoreState {
   quizStatsByPlayer: Record<string, PlayerQuizCounter>;
   gameOver: GameOverEvent | null;
   startedAt: string | null;
+  /**
+   * Antrean event terurut dari server untuk diputar satu per satu oleh
+   * lapisan Presentation Queue agar animasi & pop-up tidak saling menimpa.
+   */
+  presentationEvents: QueuedPresentationEvent[];
 
   logs: GameLogEntry[];
   toasts: ToastItem[];
@@ -92,11 +102,24 @@ export type GameStore = GameStoreState & GameStoreActions;
 
 const MAX_LOGS = 100;
 const MAX_TOASTS = 6;
+const MAX_PRESENTATION_EVENTS = 80;
 
 let uidCounter = 0;
+let presentationSeq = 0;
 function nextUid(prefix: string): string {
   uidCounter += 1;
   return `${prefix}_${Date.now()}_${uidCounter}`;
+}
+
+function appendPresentationEvent(
+  queue: QueuedPresentationEvent[],
+  event: ServerEvent,
+): QueuedPresentationEvent[] {
+  presentationSeq += 1;
+  const next = [...queue, { id: presentationSeq, event }];
+  return next.length > MAX_PRESENTATION_EVENTS
+    ? next.slice(next.length - MAX_PRESENTATION_EVENTS)
+    : next;
 }
 
 function getDefaultWsUrl(): string {
@@ -190,6 +213,7 @@ export function createInitialGameState(): GameStoreState {
     quizStatsByPlayer: {},
     gameOver: null,
     startedAt: null,
+    presentationEvents: [],
 
     logs: [],
     toasts: [],
@@ -313,6 +337,7 @@ export function reduceServerEvent(
         quizStatsByPlayer,
         gameOver: null,
         startedAt: new Date().toISOString(),
+        presentationEvents: appendPresentationEvent([], event),
         logs: appendLogBounded(
           state.logs,
           'room',
@@ -330,6 +355,10 @@ export function reduceServerEvent(
           startedAt: Date.now(),
         },
         activeQuestion: null,
+        presentationEvents: appendPresentationEvent(
+          state.presentationEvents,
+          event,
+        ),
         logs: appendLogBounded(
           state.logs,
           'turn',
@@ -367,6 +396,10 @@ export function reduceServerEvent(
         positions: nextPositions,
         room: nextRoom,
         lastMove: event,
+        presentationEvents: appendPresentationEvent(
+          state.presentationEvents,
+          event,
+        ),
         logs: appendLogBounded(state.logs, 'move', logMsg),
       };
     }
@@ -378,6 +411,10 @@ export function reduceServerEvent(
           ...event,
           startedAt: Date.now(),
         },
+        presentationEvents: appendPresentationEvent(
+          state.presentationEvents,
+          event,
+        ),
         logs: appendLogBounded(
           state.logs,
           'quiz',
@@ -437,6 +474,10 @@ export function reduceServerEvent(
           from: previousPos,
           inferredCorrect,
         },
+        presentationEvents: appendPresentationEvent(state.presentationEvents, {
+          ...event,
+          from: previousPos,
+        }),
         logs: appendLogBounded(state.logs, 'quiz', outcomeText),
       };
     }
@@ -460,6 +501,7 @@ export function reduceServerEvent(
           lastAnswerResult: null,
           gameOver: null,
           startedAt: null,
+          presentationEvents: [],
           logs: appendLogBounded(state.logs, 'status', 'Anda keluar dari room.'),
         };
       }
@@ -512,6 +554,10 @@ export function reduceServerEvent(
         activeQuestion: null,
         gameOver: event,
         room: state.room ? { ...state.room, status: 'FINISHED' } : null,
+        presentationEvents: appendPresentationEvent(
+          state.presentationEvents,
+          event,
+        ),
         logs: appendLogBounded(
           state.logs,
           'gameover',
@@ -600,6 +646,7 @@ export const useGameStore = create<GameStore>((set) => ({
       quizStatsByPlayer: {},
       gameOver: null,
       startedAt: null,
+      presentationEvents: [],
     });
   },
 }));

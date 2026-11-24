@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   ArrowDownRight,
   ArrowUpRight,
@@ -6,7 +6,8 @@ import {
   Flag,
   HelpCircle,
 } from 'lucide-react';
-import type { BoardCell, MoveEvent, RoomPlayer } from '../types/protocol';
+import type { StageBanner } from '../hooks/usePresentationQueue';
+import type { BoardCell, RoomPlayer } from '../types/protocol';
 import {
   getPawnClusterOffset,
   getPlayerPalette,
@@ -14,6 +15,7 @@ import {
   getTileCenterSvg,
   getVisualGridCells,
 } from '../utils/boardGeometry';
+import { StagePopupOverlay } from './StagePopupOverlay';
 
 interface GameBoardProps {
   board: BoardCell[];
@@ -21,7 +23,9 @@ interface GameBoardProps {
   positions: Record<string, number>;
   currentTurnPlayerId: string | null;
   myPlayerId: string | null;
-  lastMove: MoveEvent | null;
+  hoppingPlayerId: string | null;
+  highlightedPathKey: string | null;
+  stageBanner: StageBanner | null;
 }
 
 interface BoardLink {
@@ -31,14 +35,82 @@ interface BoardLink {
   to: number;
 }
 
-/** Palet ular bernuansa tabletop earthy — tajam namun tidak neon/berisik. */
 const SNAKE_THEMES = [
-  { body: '#C8523B', stripe: '#F6CFC6', head: '#963826' },
-  { body: '#8D4B5E', stripe: '#EBD3DA', head: '#633140' },
-  { body: '#456873', stripe: '#CFE0E5', head: '#2E4952' },
-  { body: '#B56B2A', stripe: '#F5DEC4', head: '#824A19' },
-  { body: '#A8423A', stripe: '#F3C8C4', head: '#782B25' },
+  { body: '#C44B34', stripe: '#F6D0C6', head: '#8F2F1E' },
+  { body: '#8D4B5E', stripe: '#EBD4DB', head: '#5E2E3C' },
+  { body: '#406672', stripe: '#CFE1E6', head: '#28454F' },
+  { body: '#B56928', stripe: '#F4DFC6', head: '#7E4616' },
+  { body: '#A64038', stripe: '#F2C9C5', head: '#732721' },
 ];
+
+/** Bidak papan nyata bergaya token kayu/enamel board game. */
+function SculptedPawnSvg({
+  colorHex,
+  initial,
+  isMe,
+}: {
+  colorHex: string;
+  initial: string;
+  isMe: boolean;
+}) {
+  return (
+    <svg
+      viewBox="0 0 36 44"
+      className="h-7 w-6 sm:h-9 sm:w-7.5 drop-shadow-[0_3px_2px_rgba(31,26,21,0.38)]"
+      aria-hidden="true"
+    >
+      {/* Bayangan alas di permukaan papan */}
+      <ellipse cx="18" cy="40.5" rx="12" ry="3" fill="#1F1A15" fillOpacity="0.26" />
+      {/* Badan kerucut bidak */}
+      <path
+        d="M11 20 C10 27 6.5 32 6.5 36.5 C6.5 38.8 11.5 40 18 40 C24.5 40 29.5 38.8 29.5 36.5 C29.5 32 26 27 25 20 Z"
+        fill={colorHex}
+        stroke={isMe ? '#1F1A15' : '#FFFDF8'}
+        strokeWidth={isMe ? '2.2' : '1.8'}
+      />
+      {/* Kerah cincin halus */}
+      <ellipse
+        cx="18"
+        cy="20.5"
+        rx="8.2"
+        ry="2.6"
+        fill={colorHex}
+        stroke="#FFFDF8"
+        strokeWidth="1.2"
+      />
+      {/* Kepala bulat bidak */}
+      <circle
+        cx="18"
+        cy="11.5"
+        r="8.5"
+        fill={colorHex}
+        stroke={isMe ? '#1F1A15' : '#FFFDF8'}
+        strokeWidth={isMe ? '2.2' : '1.8'}
+      />
+      {/* Kilap bevel halus */}
+      <path
+        d="M13 8.5 A5.5 5.5 0 0 1 18.5 5.5"
+        fill="none"
+        stroke="#FFFDF8"
+        strokeOpacity="0.55"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+      {/* Inisial pemain */}
+      <text
+        x="18"
+        y="33.5"
+        textAnchor="middle"
+        fill="#FFFDF8"
+        fontSize="11.5"
+        fontWeight="800"
+        fontFamily="Bricolage Grotesque, sans-serif"
+      >
+        {initial}
+      </text>
+    </svg>
+  );
+}
 
 function LadderSvg({
   fromTile,
@@ -61,7 +133,6 @@ function LadderSvg({
   const nx = -uy;
   const ny = ux;
 
-  // Geser ujung sedikit masuk agar tidak menabrak tepi petak atau angka
   const trim = Math.min(18, length * 0.1);
   const sx = start.x + ux * trim;
   const sy = start.y + uy * trim;
@@ -71,7 +142,7 @@ function LadderSvg({
   const innerDy = ey - sy;
   const innerLen = Math.hypot(innerDx, innerDy) || 1;
 
-  const halfWidth = 11.5;
+  const halfWidth = 11;
   const left1 = { x: sx + nx * halfWidth, y: sy + ny * halfWidth };
   const left2 = { x: ex + nx * halfWidth, y: ey + ny * halfWidth };
   const right1 = { x: sx - nx * halfWidth, y: sy - ny * halfWidth };
@@ -93,7 +164,7 @@ function LadderSvg({
   return (
     <g
       style={{
-        opacity: isHighlighted ? 1 : isDimmed ? 0.28 : 0.88,
+        opacity: isHighlighted ? 1 : isDimmed ? 0.25 : 0.88,
         transition: 'opacity 180ms ease',
       }}
       filter="url(#tabletop-shadow)"
@@ -104,14 +175,13 @@ function LadderSvg({
           y1={sy}
           x2={ex}
           y2={ey}
-          stroke="#2F7D57"
+          stroke="#266D4B"
           strokeOpacity={0.28}
           strokeWidth={34}
           strokeLinecap="round"
         />
       )}
 
-      {/* Anak tangga geometris */}
       {rungs.map((r, i) => (
         <g key={i}>
           <line
@@ -119,8 +189,8 @@ function LadderSvg({
             y1={r.y1}
             x2={r.x2}
             y2={r.y2}
-            stroke="#5C3D24"
-            strokeWidth={5.2}
+            stroke="#5A3A20"
+            strokeWidth={5}
             strokeLinecap="round"
           />
           <line
@@ -128,14 +198,13 @@ function LadderSvg({
             y1={r.y1}
             x2={r.x2}
             y2={r.y2}
-            stroke="#C79663"
-            strokeWidth={2.2}
+            stroke="#C99660"
+            strokeWidth={2}
             strokeLinecap="round"
           />
         </g>
       ))}
 
-      {/* Rel kayu kiri & kanan dengan aksen hijau sage */}
       {[
         [left1, left2],
         [right1, right2],
@@ -146,8 +215,8 @@ function LadderSvg({
             y1={p1.y}
             x2={p2.x}
             y2={p2.y}
-            stroke="#1F5C40"
-            strokeWidth={isHighlighted ? 7.2 : 6}
+            stroke="#1C5439"
+            strokeWidth={isHighlighted ? 7 : 5.8}
             strokeLinecap="round"
           />
           <line
@@ -155,8 +224,8 @@ function LadderSvg({
             y1={p1.y}
             x2={p2.x}
             y2={p2.y}
-            stroke="#4EA076"
-            strokeWidth={2.2}
+            stroke="#50A076"
+            strokeWidth={2}
             strokeLinecap="round"
           />
         </g>
@@ -197,7 +266,7 @@ function SnakeSvg({
   const spanDx = tx - hx;
   const spanDy = ty - hy;
 
-  const wave = Math.min(44, Math.max(22, length * 0.14));
+  const wave = Math.min(42, Math.max(20, length * 0.14));
   const dir = variantIndex % 2 === 0 ? 1 : -1;
 
   const cp1x = hx + spanDx * 0.34 + nx * wave * dir;
@@ -212,7 +281,7 @@ function SnakeSvg({
   return (
     <g
       style={{
-        opacity: isHighlighted ? 1 : isDimmed ? 0.28 : 0.88,
+        opacity: isHighlighted ? 1 : isDimmed ? 0.25 : 0.88,
         transition: 'opacity 180ms ease',
       }}
       filter="url(#tabletop-shadow)"
@@ -228,50 +297,45 @@ function SnakeSvg({
         />
       )}
 
-      {/* Outline ink tipis */}
       <path
         d={d}
         fill="none"
-        stroke="#2C2621"
-        strokeOpacity={0.28}
-        strokeWidth={isHighlighted ? 14 : 12}
+        stroke="#2A1E15"
+        strokeOpacity={0.26}
+        strokeWidth={isHighlighted ? 13.5 : 11.5}
         strokeLinecap="round"
       />
-      {/* Badan ular */}
       <path
         d={d}
         fill="none"
         stroke={theme.body}
-        strokeWidth={isHighlighted ? 11 : 9.5}
+        strokeWidth={isHighlighted ? 10.5 : 9}
         strokeLinecap="round"
       />
-      {/* Aksen sisik geometris halus */}
       <path
         d={d}
         fill="none"
         stroke={theme.stripe}
-        strokeWidth={3.4}
+        strokeWidth={3.2}
         strokeDasharray="6 12"
         strokeLinecap="round"
       />
-      {/* Ujung ekor meruncing */}
-      <circle cx={tx} cy={ty} r={3.8} fill={theme.body} />
+      <circle cx={tx} cy={ty} r={3.6} fill={theme.body} />
 
-      {/* Kepala ular proporsional & bersih */}
       <g transform={`translate(${hx}, ${hy}) rotate(${angleDeg})`}>
         <ellipse
           cx={0}
           cy={0}
-          rx={isHighlighted ? 11.5 : 10.5}
-          ry={isHighlighted ? 8.8 : 8}
+          rx={isHighlighted ? 11 : 10}
+          ry={isHighlighted ? 8.4 : 7.6}
           fill={theme.head}
           stroke="#FFFDF8"
           strokeWidth={1.2}
         />
-        <circle cx={-2.5} cy={-3.2} r={2.2} fill="#FFFDF8" />
-        <circle cx={-2.5} cy={3.2} r={2.2} fill="#FFFDF8" />
-        <circle cx={-3.1} cy={-3.2} r={1.1} fill="#1F1B17" />
-        <circle cx={-3.1} cy={3.2} r={1.1} fill="#1F1B17" />
+        <circle cx={-2.4} cy={-3} r={2.1} fill="#FFFDF8" />
+        <circle cx={-2.4} cy={3} r={2.1} fill="#FFFDF8" />
+        <circle cx={-3} cy={-3} r={1.05} fill="#1F1A15" />
+        <circle cx={-3} cy={3} r={1.05} fill="#1F1A15" />
       </g>
     </g>
   );
@@ -283,7 +347,9 @@ export function GameBoard({
   positions,
   currentTurnPlayerId,
   myPlayerId,
-  lastMove,
+  hoppingPlayerId,
+  highlightedPathKey,
+  stageBanner,
 }: GameBoardProps) {
   const orderedCells = useMemo(() => getVisualGridCells(board), [board]);
 
@@ -331,121 +397,31 @@ export function GameBoard({
   }, [ladders, snakes]);
 
   const [hoveredTile, setHoveredTile] = useState<number | null>(null);
-  const [landingHighlightKey, setLandingHighlightKey] = useState<string | null>(
-    null,
-  );
-
-  const [visualPositions, setVisualPositions] =
-    useState<Record<string, number>>(positions);
-  const [hoppingPlayerId, setHoppingPlayerId] = useState<string | null>(null);
-  const animTimersRef = useRef<Array<ReturnType<typeof setTimeout>>>([]);
-  const lastAnimatedMoveRef = useRef<MoveEvent | null>(null);
-
-  useEffect(() => {
-    setVisualPositions((prev) => {
-      const next: Record<string, number> = { ...prev };
-      for (const [pid, pos] of Object.entries(positions)) {
-        if (pid !== hoppingPlayerId || next[pid] === undefined) {
-          next[pid] = pos;
-        }
-      }
-      return next;
-    });
-  }, [positions, hoppingPlayerId]);
-
-  // Animasikan langkah pion mengikuti array `path` + sorot jalur ular/tangga saat mendarat
-  useEffect(() => {
-    if (!lastMove || lastMove === lastAnimatedMoveRef.current) return;
-    lastAnimatedMoveRef.current = lastMove;
-
-    for (const t of animTimersRef.current) clearTimeout(t);
-    animTimersRef.current = [];
-
-    const steps = lastMove.path.length > 0 ? lastMove.path : [lastMove.to];
-    const pid = lastMove.playerId;
-
-    setHoppingPlayerId(pid);
-    setVisualPositions((prev) => ({ ...prev, [pid]: lastMove.from }));
-
-    const stepMs = 140;
-    steps.forEach((tile, idx) => {
-      const timer = setTimeout(() => {
-        setVisualPositions((prev) => ({ ...prev, [pid]: tile }));
-      }, (idx + 1) * stepMs);
-      animTimersRef.current.push(timer);
-    });
-
-    const lastStep = steps[steps.length - 1];
-    const hasJump = lastStep !== lastMove.to;
-    const landedLink =
-      lastMove.effect === 'SNAKE' || lastMove.effect === 'LADDER'
-        ? `${lastMove.effect}-${lastStep}-${lastMove.to}`
-        : null;
-
-    if (landedLink) {
-      const highlightStart = setTimeout(() => {
-        setLandingHighlightKey(landedLink);
-      }, steps.length * stepMs);
-      animTimersRef.current.push(highlightStart);
-
-      const highlightEnd = setTimeout(() => {
-        setLandingHighlightKey((curr) => (curr === landedLink ? null : curr));
-      }, steps.length * stepMs + 2_000);
-      animTimersRef.current.push(highlightEnd);
-    }
-
-    if (hasJump) {
-      const jumpTimer = setTimeout(() => {
-        setVisualPositions((prev) => ({ ...prev, [pid]: lastMove.to }));
-      }, steps.length * stepMs + 190);
-      animTimersRef.current.push(jumpTimer);
-    }
-
-    const finishDelay =
-      (steps.length + 1) * stepMs + (hasJump ? 220 : 60);
-    const doneTimer = setTimeout(() => {
-      setVisualPositions((prev) => ({
-        ...prev,
-        [pid]: positions[pid] ?? lastMove.to,
-      }));
-      setHoppingPlayerId(null);
-    }, finishDelay);
-    animTimersRef.current.push(doneTimer);
-
-    return () => {
-      for (const t of animTimersRef.current) clearTimeout(t);
-      animTimersRef.current = [];
-    };
-  }, [lastMove, positions]);
 
   const activeLink: BoardLink | null = useMemo(() => {
-    if (hoveredTile !== null) {
-      return linkByTile.get(hoveredTile) ?? null;
-    }
-    if (landingHighlightKey) {
+    if (highlightedPathKey) {
       return (
-        [...ladders, ...snakes].find((l) => l.key === landingHighlightKey) ??
+        [...ladders, ...snakes].find((l) => l.key === highlightedPathKey) ??
         null
       );
     }
+    if (hoveredTile !== null) {
+      return linkByTile.get(hoveredTile) ?? null;
+    }
     return null;
-  }, [hoveredTile, linkByTile, landingHighlightKey, ladders, snakes]);
+  }, [hoveredTile, linkByTile, highlightedPathKey, ladders, snakes]);
 
   const groupedByTile = useMemo(() => {
     const map = new Map<number, RoomPlayer[]>();
     for (const player of players) {
       if (player.status === 'left') continue;
-      const tile =
-        visualPositions[player.playerId] ??
-        positions[player.playerId] ??
-        player.position ??
-        1;
+      const tile = positions[player.playerId] ?? player.position ?? 1;
       const list = map.get(tile) ?? [];
       list.push(player);
       map.set(tile, list);
     }
     return map;
-  }, [players, visualPositions, positions]);
+  }, [players, positions]);
 
   const questionCount = useMemo(
     () => board.filter((c) => c.type === 'QUESTION').length,
@@ -453,11 +429,13 @@ export function GameBoard({
   );
 
   return (
-    <div className="w-full">
-      {/* Bingkai Papan Kayu Walnut Tabletop */}
-      <div className="board-wood-frame relative mx-auto aspect-square w-full max-w-[700px] lg:max-w-[min(700px,calc(100vh-170px))] rounded-2xl p-2 sm:rounded-[22px] sm:p-3">
-        {/* Mat Krem Bagian Dalam */}
-        <div className="relative h-full w-full overflow-hidden rounded-xl border-2 border-[#E5D7BE] bg-[#FAF6EE]">
+    <div className="flex h-full w-full flex-col items-center justify-center min-h-0">
+      {/* Papan 10x10 terkunci agar selalu muat 100% di dalam viewport tanpa scroll */}
+      <div
+        data-board-frame
+        className="board-wood-frame relative aspect-square w-[min(calc(100vw-16px),calc(100dvh-166px))] max-w-full lg:w-auto lg:h-[min(calc(100dvh-106px),760px)] lg:max-w-full rounded-2xl p-1.5 sm:rounded-[20px] sm:p-2.5"
+      >
+        <div className="relative h-full w-full overflow-hidden rounded-xl border-2 border-[#E3D3B8] bg-[#FAF5EB]">
           {/* Grid 10x10 Zig-Zag */}
           <div className="grid h-full w-full grid-cols-10 grid-rows-10">
             {orderedCells.map((cell, gridIdx) => {
@@ -469,23 +447,23 @@ export function GameBoard({
                 activeLink !== null &&
                 (activeLink.from === cell.index || activeLink.to === cell.index);
 
-              let tileBg = isEvenCheck ? 'bg-[#FFFDF8]' : 'bg-[#F3ECE0]';
+              let tileBg = isEvenCheck ? 'bg-[#FFFDF8]' : 'bg-[#F2E9D9]';
               if (cell.index === 1) {
-                tileBg = 'bg-[#E6F2EB]';
+                tileBg = 'bg-[#E3F1E8]';
               } else if (cell.index === 100) {
-                tileBg = 'bg-[#F8E7B4]';
+                tileBg = 'bg-[#F7E3AC]';
               } else if (cell.type === 'LADDER') {
-                tileBg = 'bg-[#E9F4ED]';
+                tileBg = 'bg-[#E7F3EC]';
               } else if (cell.type === 'SNAKE') {
-                tileBg = 'bg-[#FCECE8]';
+                tileBg = 'bg-[#FCEBE6]';
               } else if (cell.type === 'QUESTION') {
-                tileBg = 'bg-[#FDF4DC]';
+                tileBg = 'bg-[#FDF3D7]';
               }
 
               const activeRing = isEndpointActive
                 ? activeLink.type === 'LADDER'
-                  ? 'ring-2 ring-inset ring-[#2F7D57] z-[5]'
-                  : 'ring-2 ring-inset ring-[#C8523B] z-[5]'
+                  ? 'ring-2 ring-inset ring-[#266D4B] z-[5]'
+                  : 'ring-2 ring-inset ring-[#C44B34] z-[5]'
                 : '';
 
               return (
@@ -508,22 +486,21 @@ export function GameBoard({
                       prev === cell.index ? null : cell.index,
                     );
                   }}
-                  className={`relative flex flex-col justify-between border border-[#DFD5C5] p-0.5 sm:p-1 select-none transition-colors ${tileBg} ${activeRing} ${
+                  className={`relative flex flex-col justify-between border border-[#DDD1BE] p-0.5 sm:p-1 select-none transition-colors ${tileBg} ${activeRing} ${
                     tileLink ? 'cursor-pointer' : ''
                   }`}
                 >
-                  {/* Pojok kiri-atas khusus nomor petak agar selalu bersih & terbaca */}
                   <div className="flex items-start justify-between">
                     <span
-                      className={`relative z-[15] rounded px-0.5 font-display text-[9px] font-bold leading-none sm:text-[11px] ${
+                      className={`relative z-[15] font-display text-[9px] font-bold leading-none sm:text-[11px] ${
                         cell.index === 100
-                          ? 'text-[#7D530B]'
+                          ? 'text-[#7A4F08]'
                           : cell.type === 'SNAKE'
-                            ? 'text-[#963826]'
+                            ? 'text-[#8F2F1E]'
                             : cell.type === 'LADDER'
-                              ? 'text-[#1F5C40]'
+                              ? 'text-[#1D5439]'
                               : cell.type === 'QUESTION'
-                                ? 'text-[#8C5B12]'
+                                ? 'text-[#8A580F]'
                                 : 'text-[#5A5045]'
                       }`}
                     >
@@ -534,23 +511,22 @@ export function GameBoard({
                       <Crown className="h-3 w-3 text-[#B7791F] sm:h-3.5 sm:w-3.5" />
                     )}
                     {cell.index === 1 && (
-                      <Flag className="h-3 w-3 text-[#2F7D57] sm:h-3.5 sm:w-3.5" />
+                      <Flag className="h-3 w-3 text-[#266D4B] sm:h-3.5 sm:w-3.5" />
                     )}
                     {cell.type === 'QUESTION' && (
                       <HelpCircle className="h-3 w-3 text-[#B7791F] sm:h-3.5 sm:w-3.5" />
                     )}
                   </div>
 
-                  {/* Penanda tujuan ringkas di sudut kanan-bawah */}
                   <div className="flex items-end justify-end">
                     {cell.type === 'LADDER' && cell.to !== undefined && (
-                      <span className="inline-flex items-center rounded bg-[#2F7D57] px-1 py-0.5 font-code text-[7px] font-bold leading-none text-[#FFFDF8] sm:text-[8px]">
+                      <span className="inline-flex items-center rounded bg-[#266D4B] px-1 py-0.5 font-code text-[7px] font-bold leading-none text-[#FFFDF8] sm:text-[8px]">
                         <ArrowUpRight className="hidden h-2.5 w-2.5 sm:inline" />
                         {cell.to}
                       </span>
                     )}
                     {cell.type === 'SNAKE' && cell.to !== undefined && (
-                      <span className="inline-flex items-center rounded bg-[#C8523B] px-1 py-0.5 font-code text-[7px] font-bold leading-none text-[#FFFDF8] sm:text-[8px]">
+                      <span className="inline-flex items-center rounded bg-[#C44B34] px-1 py-0.5 font-code text-[7px] font-bold leading-none text-[#FFFDF8] sm:text-[8px]">
                         <ArrowDownRight className="hidden h-2.5 w-2.5 sm:inline" />
                         {cell.to}
                       </span>
@@ -561,7 +537,7 @@ export function GameBoard({
             })}
           </div>
 
-          {/* Overlay SVG: Tangga & Ular Dinamis */}
+          {/* Overlay SVG: Tangga & Ular */}
           <svg
             viewBox="0 0 1000 1000"
             preserveAspectRatio="none"
@@ -579,8 +555,8 @@ export function GameBoard({
                 <feDropShadow
                   dx="0"
                   dy="2"
-                  stdDeviation="2.2"
-                  floodColor="#2C2621"
+                  stdDeviation="2"
+                  floodColor="#2A1E15"
                   floodOpacity="0.18"
                 />
               </filter>
@@ -608,7 +584,7 @@ export function GameBoard({
             ))}
           </svg>
 
-          {/* Pion Pemain Bergaya Token Kayu */}
+          {/* Pion Bidak Nyata */}
           <div className="pointer-events-none absolute inset-0 z-20">
             {Array.from(groupedByTile.entries()).flatMap(([tile, group]) =>
               group.map((player, slotIndex) => {
@@ -625,69 +601,70 @@ export function GameBoard({
                 return (
                   <div
                     key={player.playerId}
+                    data-pawn={player.playerId}
+                    data-pawn-tile={tile}
                     title={`${player.name} — Petak ${tile}`}
                     style={{
                       left: `${leftPct + dxPct}%`,
                       top: `${topPct + dyPct}%`,
                       transition:
-                        'left 135ms cubic-bezier(0.22, 1, 0.36, 1), top 135ms cubic-bezier(0.22, 1, 0.36, 1)',
+                        'left 220ms cubic-bezier(0.22, 1, 0.36, 1), top 220ms cubic-bezier(0.22, 1, 0.36, 1)',
                     }}
-                    className={`absolute -translate-x-1/2 -translate-y-1/2 ${
+                    className={`absolute -translate-x-1/2 -translate-y-[62%] ${
                       isTurn ? 'z-30' : 'z-20'
-                    } ${isHopping ? 'animate-pawn-hop' : ''}`}
+                    } ${isHopping ? 'animate-pawn-hop' : ''} ${
+                      !player.online ? 'opacity-45 grayscale' : ''
+                    }`}
                   >
                     {isTurn && (
-                      <span
-                        className="absolute -inset-1.5 rounded-full border-2 border-[#1F1B17]/35 animate-ping"
-                      />
+                      <span className="absolute left-1/2 bottom-0 h-3 w-7 -translate-x-1/2 rounded-full border-2 border-[#C44B34]/80 animate-ping" />
                     )}
-                    <div
-                      className={`relative flex h-6 w-6 items-center justify-center rounded-full border-2 border-[#FFFDF8] font-display text-[10px] font-extrabold text-[#FFFDF8] shadow-[0_2px_0_0_rgba(31,27,23,0.45)] sm:h-7.5 sm:w-7.5 sm:text-xs ${
-                        palette.bg
-                      } ${isMe ? 'ring-2 ring-[#1F1B17]' : ''} ${
-                        !player.online ? 'opacity-45 grayscale' : ''
-                      }`}
-                    >
-                      {player.name.slice(0, 1).toUpperCase()}
-                    </div>
+                    <SculptedPawnSvg
+                      colorHex={palette.hex}
+                      initial={player.name.slice(0, 1).toUpperCase()}
+                      isMe={isMe}
+                    />
                   </div>
                 );
               }),
             )}
           </div>
+
+          {/* Pop-up Giliran & Efek Ular/Tangga terpusat di atas papan */}
+          <StagePopupOverlay banner={stageBanner} />
         </div>
       </div>
 
-      {/* Bar Keterangan Papan & Sorot Jalur */}
-      <div className="mx-auto mt-3 flex max-w-[700px] lg:max-w-[min(700px,calc(100vh-170px))] flex-wrap items-center justify-between gap-2 px-1 text-[11px] font-semibold text-[#645A4E]">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="inline-flex items-center gap-1 rounded-md border border-[#BBDAC8] bg-[#E6F2EB] px-2 py-0.5 text-[#1F5C40]">
+      {/* Bar Keterangan Ringkas Satu Baris di Bawah Papan */}
+      <div className="mt-1.5 flex w-full max-w-[760px] items-center justify-between gap-2 px-1 text-[11px] font-semibold text-[#605549]">
+        <div className="flex items-center gap-3">
+          <span className="inline-flex items-center gap-1 text-[#1D5439]">
             <ArrowUpRight className="h-3.5 w-3.5" />
             Tangga ({ladders.length})
           </span>
-          <span className="inline-flex items-center gap-1 rounded-md border border-[#ECC1B7] bg-[#FCEBE7] px-2 py-0.5 text-[#963826]">
+          <span className="inline-flex items-center gap-1 text-[#8F2F1E]">
             <ArrowDownRight className="h-3.5 w-3.5" />
             Ular ({snakes.length})
           </span>
-          <span className="inline-flex items-center gap-1 rounded-md border border-[#E7CB82] bg-[#FDF3D7] px-2 py-0.5 text-[#8C5B12]">
+          <span className="inline-flex items-center gap-1 text-[#8A580F]">
             <HelpCircle className="h-3.5 w-3.5" />
-            Kuis IT ({questionCount})
+            Kuis ({questionCount})
           </span>
         </div>
 
-        <span className="text-[11px] font-semibold text-[#5A5045]">
+        <span className="hidden sm:inline truncate text-[11px] font-medium text-[#605549]">
           {activeLink ? (
             activeLink.type === 'LADDER' ? (
-              <span className="text-[#1F5C40]">
-                Tangga: Petak {activeLink.from} → Petak {activeLink.to}
-              </span>
+              <strong className="text-[#1D5439]">
+                Tangga: Petak {activeLink.from} → {activeLink.to}
+              </strong>
             ) : (
-              <span className="text-[#963826]">
-                Ular: Petak {activeLink.from} → Petak {activeLink.to}
-              </span>
+              <strong className="text-[#8F2F1E]">
+                Ular: Petak {activeLink.from} → {activeLink.to}
+              </strong>
             )
           ) : (
-            <span>Arahkan kursor atau ketuk ular/tangga untuk menyorot jalur</span>
+            'Arahkan kursor ke petak ular/tangga untuk menyorot jalur'
           )}
         </span>
       </div>
