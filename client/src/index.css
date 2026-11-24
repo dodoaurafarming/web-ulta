@@ -1,1 +1,82 @@
 @import "tailwindcss";
+
+@layer base {
+  :root {
+    --font-display: 'Fredoka', ui-rounded, system-ui, sans-serif;
+    --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  }
+
+  body {
+    font-family: var(--font-sans);
+    background-color: #fffbeb;
+    background-image:
+      radial-gradient(circle at 12% 14%, rgba(251, 191, 36, 0.24) 0%, transparent 36%),
+      radial-gradient(circle at 88% 18%, rgba(56, 189, 248, 0.22) 0%, transparent 38%),
+      radial-gradient(circle at 50% 92%, rgba(244, 63, 94, 0.14) 0%, transparent 40%),
+      radial-gradient(rgba(148, 163, 184, 0.16) 1px, transparent 1px);
+    background-size: 100% 100%, 100% 100%, 100% 100%, 24px 24px;
+    min-height: 100vh;
+  }
+
+  h1, h2, h3, .font-display {
+    font-family: var(--font-display);
+  }
+
+  .font-code {
+    font-family: var(--font-mono);
+  }
+}
+
+@keyframes dice-tumble {
+  0% { transform: rotate(0deg) scale(1); }
+  25% { transform: rotate(-18deg) scale(1.1) translateY(-4px); }
+  50% { transform: rotate(16deg) scale(0.96) translateY(2px); }
+  75% { transform: rotate(-10deg) scale(1.08) translateY(-2px); }
+  100% { transform: rotate(0deg) scale(1); }
+}
+
+@keyframes pawn-hop {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); }
+  50% { transform: translate(-50%, -72%) scale(1.18); }
+}
+
+@keyframes toast-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes float-confetti {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-8px) rotate(8deg); }
+}
+
+.animate-dice-tumble {
+  animation: dice-tumble 0.45s ease-in-out infinite;
+}
+
+.animate-pawn-hop {
+  animation: pawn-hop 0.22s ease-out;
+}
+
+.animate-toast-enter {
+  animation: toast-enter 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-float-confetti {
+  animation: float-confetti 2.4s ease-in-out infinite;
+}
+
+.btn-tactile {
+  transition: transform 0.1s ease, box-shadow 0.1s ease, background-color 0.15s ease;
+}
+
+.btn-tactile:active:not(:disabled) {
+  transform: translateY(2px);
+}
