@@ -8,44 +8,40 @@ export function LeaderboardPlaceholder({
   onBackToGame,
 }: LeaderboardPlaceholderProps) {
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
-      <div className="rounded-3xl border-2 border-indigo-200 bg-white/95 p-6 text-center shadow-xl sm:p-10 space-y-5">
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-lg">
-          <Trophy className="h-8 w-8" />
+    <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
+      <div className="surface-card rounded-2xl p-6 text-center sm:p-9 space-y-5">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border-2 border-[#E5C068] bg-[#FDF3D7] text-[#B7791F]">
+          <Trophy className="h-7 w-7" />
         </div>
 
         <div className="space-y-2">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-100 px-3 py-1 text-xs font-extrabold text-indigo-700">
-            <Database className="h-3.5 w-3.5" />
+          <span className="inline-flex items-center gap-1.5 rounded-md border border-[#D9CEBC] bg-[#F3ECE0] px-3 py-1 text-xs font-bold text-[#5A5045]">
+            <Database className="h-3.5 w-3.5 text-[#2F7D57]" />
             <span>Integrasi Prisma + TiDB Cloud — Tahap 5</span>
           </span>
-          <h1 className="font-display text-3xl font-bold text-slate-900">
+          <h1 className="font-display text-2xl font-extrabold text-[#1F1B17] sm:text-3xl">
             Leaderboard & Riwayat Pertandingan
           </h1>
-          <p className="mx-auto max-w-lg text-sm font-medium text-slate-600">
+          <p className="mx-auto max-w-lg text-sm font-medium text-[#645A4E] leading-relaxed">
             Halaman ini akan menampilkan papan peringkat pemain (total main,
-            kemenangan, win rate, akurasi kuis IT) serta riwayat pertandingan
-            dari REST API <code>/api/leaderboard</code> dan{' '}
+            kemenangan, win rate, dan akurasi kuis IT) serta riwayat
+            pertandingan dari API <code>/api/leaderboard</code> dan{' '}
             <code>/api/matches</code> pada Tahap 5.
           </p>
         </div>
 
-        <div className="mx-auto grid max-w-lg grid-cols-2 gap-3 text-left">
-          <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-3.5">
-            <Trophy className="h-5 w-5 text-amber-600 mb-1.5" />
-            <p className="text-xs font-extrabold text-slate-900">
-              Top Leaderboard
-            </p>
-            <p className="text-[11px] text-slate-600">
-              Peringkat & statistik akurasi kuis
+        <div className="mx-auto grid max-w-lg grid-cols-1 gap-3 text-left sm:grid-cols-2">
+          <div className="rounded-xl border border-[#E7CB82] bg-[#FDF4DC] p-3.5">
+            <Trophy className="h-4.5 w-4.5 text-[#B7791F] mb-1.5" />
+            <p className="text-xs font-bold text-[#1F1B17]">Top Leaderboard</p>
+            <p className="text-[11px] text-[#5A5045]">
+              Peringkat pemain & akurasi kuis IT
             </p>
           </div>
-          <div className="rounded-2xl border border-sky-200 bg-sky-50/70 p-3.5">
-            <History className="h-5 w-5 text-sky-600 mb-1.5" />
-            <p className="text-xs font-extrabold text-slate-900">
-              Riwayat Match
-            </p>
-            <p className="text-[11px] text-slate-600">
+          <div className="rounded-xl border border-[#C6DFD0] bg-[#EBF5EF] p-3.5">
+            <History className="h-4.5 w-4.5 text-[#2F7D57] mb-1.5" />
+            <p className="text-xs font-bold text-[#1F1B17]">Riwayat Match</p>
+            <p className="text-[11px] text-[#5A5045]">
               Kode room, peserta, & pemenang
             </p>
           </div>
@@ -54,7 +50,7 @@ export function LeaderboardPlaceholder({
         <button
           type="button"
           onClick={onBackToGame}
-          className="btn-tactile inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-5 py-2.5 text-sm font-extrabold text-white shadow-[0_3px_0_0_#3730a3] hover:bg-indigo-700 cursor-pointer"
+          className="btn-tactile inline-flex items-center gap-2 rounded-xl border-[1.5px] border-[#1F1B17] bg-[#1F1B17] px-5 py-2.5 text-sm font-bold text-[#FFFDF8] shadow-[0_3px_0_0_#4A3F35] hover:bg-[#332A22] cursor-pointer"
         >
           <ArrowLeft className="h-4 w-4" />
           <span>Kembali ke Permainan</span>

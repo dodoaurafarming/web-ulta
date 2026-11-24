@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   MockGameTransport,
+  doGridSegmentsIntersect,
   generateMockBoard,
 } from '../src/services/mockTransport';
 import { parseServerEvent } from '../src/services/protocolParser';
@@ -277,27 +278,92 @@ test('reduceServerEvent: alur penuh game state, inferensi penonton, dan toast er
   assert.equal(state.gameOver?.winnerName, 'Syarif');
 });
 
-test('generateMockBoard: tepat 100 petak, petak 1 & 100 NORMAL, 8 ular, 8 tangga, 10 soal', () => {
-  const board = generateMockBoard(createSeededRng(12345));
-  assert.equal(board.length, 100);
-  assert.equal(board[0].type, 'NORMAL');
-  assert.equal(board[99].type, 'NORMAL');
+test('generateMockBoard: 5 ular, 5 tangga, 6 soal, jarak grid >= 2, lompatan wajar, anti-crossing', () => {
+  const toGrid = (tile: number) => {
+    const row = Math.floor((tile - 1) / 10);
+    const colInRow = (tile - 1) % 10;
+    const col = row % 2 === 1 ? 9 - colInRow : colInRow;
+    return { tile, row, col };
+  };
 
-  const snakes = board.filter((c) => c.type === 'SNAKE');
-  const ladders = board.filter((c) => c.type === 'LADDER');
-  const questions = board.filter((c) => c.type === 'QUESTION');
-  const normals = board.filter((c) => c.type === 'NORMAL');
+  for (let seed = 101; seed <= 120; seed += 1) {
+    const board = generateMockBoard(createSeededRng(seed));
+    assert.equal(board.length, 100);
+    assert.equal(board[0].type, 'NORMAL');
+    assert.equal(board[99].type, 'NORMAL');
 
-  assert.equal(snakes.length, 8);
-  assert.equal(ladders.length, 8);
-  assert.equal(questions.length, 10);
-  assert.equal(normals.length, 74);
+    const snakes = board.filter((c) => c.type === 'SNAKE');
+    const ladders = board.filter((c) => c.type === 'LADDER');
+    const questions = board.filter((c) => c.type === 'QUESTION');
+    const normals = board.filter((c) => c.type === 'NORMAL');
 
-  for (const snake of snakes) {
-    assert.ok(typeof snake.to === 'number' && snake.to < snake.index);
-  }
-  for (const ladder of ladders) {
-    assert.ok(typeof ladder.to === 'number' && ladder.to > ladder.index);
+    assert.equal(snakes.length, 5, `Seed ${seed}: harus tepat 5 ular`);
+    assert.equal(ladders.length, 5, `Seed ${seed}: harus tepat 5 tangga`);
+    assert.equal(questions.length, 6, `Seed ${seed}: harus tepat 6 soal`);
+    assert.equal(normals.length, 84, `Seed ${seed}: harus tepat 84 normal`);
+
+    const paths = [...snakes, ...ladders].map((c) => {
+      assert.ok(typeof c.to === 'number');
+      if (c.type === 'SNAKE') assert.ok(c.to < c.index);
+      if (c.type === 'LADDER') assert.ok(c.to > c.index);
+      return { from: toGrid(c.index), to: toGrid(c.to) };
+    });
+
+    // Panjang lompatan: 1–3 baris, maksimal 1 jalur 4 baris
+    let longJumpCount = 0;
+    for (const path of paths) {
+      const deltaRow = Math.abs(path.to.row - path.from.row);
+      assert.ok(
+        deltaRow >= 1 && deltaRow <= 4,
+        `Seed ${seed}: panjang baris ${deltaRow} di luar 1..4`,
+      );
+      if (deltaRow === 4) longJumpCount += 1;
+    }
+    assert.ok(
+      longJumpCount <= 1,
+      `Seed ${seed}: terlalu banyak jalur 4 baris (${longJumpCount})`,
+    );
+
+    // Jarak grid minimal 2 petak antar seluruh kepala/ekor/ujung
+    const allEndpoints = paths.flatMap((p) => [p.from, p.to]);
+    for (let i = 0; i < allEndpoints.length; i += 1) {
+      for (let j = i + 1; j < allEndpoints.length; j += 1) {
+        const dist = Math.max(
+          Math.abs(allEndpoints[i].row - allEndpoints[j].row),
+          Math.abs(allEndpoints[i].col - allEndpoints[j].col),
+        );
+        assert.ok(
+          dist >= 2,
+          `Seed ${seed}: endpoint ${allEndpoints[i].tile} dan ${allEndpoints[j].tile} terlalu dekat (dist=${dist})`,
+        );
+      }
+    }
+
+    // Anti-crossing: tidak ada garis ular/tangga yang saling bersilangan
+    for (let i = 0; i < paths.length; i += 1) {
+      for (let j = i + 1; j < paths.length; j += 1) {
+        const crosses = doGridSegmentsIntersect(
+          paths[i].from.tile,
+          paths[i].to.tile,
+          paths[j].from.tile,
+          paths[j].to.tile,
+        );
+        assert.equal(
+          crosses,
+          false,
+          `Seed ${seed}: jalur ${paths[i].from.tile}->${paths[i].to.tile} bersilangan dengan ${paths[j].from.tile}->${paths[j].to.tile}`,
+        );
+      }
+    }
+
+    // Sebaran zona bawah (0..2), tengah (3..6), atas (7..9)
+    const startRows = paths.map((p) => p.from.row);
+    assert.ok(startRows.some((r) => r <= 2), 'Harus ada jalur di zona bawah');
+    assert.ok(
+      startRows.some((r) => r >= 3 && r <= 6),
+      'Harus ada jalur di zona tengah',
+    );
+    assert.ok(startRows.some((r) => r >= 7), 'Harus ada jalur di zona atas');
   }
 });
 

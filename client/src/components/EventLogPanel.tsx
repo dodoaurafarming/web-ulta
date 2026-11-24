@@ -20,14 +20,14 @@ const LOG_STYLE: Record<
   LogCategory,
   { icon: typeof Info; badge: string }
 > = {
-  system: { icon: Info, badge: 'bg-slate-100 text-slate-600' },
-  room: { icon: Users, badge: 'bg-indigo-100 text-indigo-700' },
-  turn: { icon: Dices, badge: 'bg-amber-100 text-amber-700' },
-  move: { icon: Footprints, badge: 'bg-emerald-100 text-emerald-700' },
-  quiz: { icon: Brain, badge: 'bg-violet-100 text-violet-700' },
-  status: { icon: WifiOff, badge: 'bg-orange-100 text-orange-700' },
-  error: { icon: AlertCircle, badge: 'bg-rose-100 text-rose-700' },
-  gameover: { icon: Trophy, badge: 'bg-yellow-100 text-yellow-800' },
+  system: { icon: Info, badge: 'bg-[#F3ECE0] text-[#645A4E]' },
+  room: { icon: Users, badge: 'bg-[#EAF2FB] text-[#1E4B7A]' },
+  turn: { icon: Dices, badge: 'bg-[#FDF3D7] text-[#8C5B12]' },
+  move: { icon: Footprints, badge: 'bg-[#E6F2EB] text-[#1F5C40]' },
+  quiz: { icon: Brain, badge: 'bg-[#F3ECF7] text-[#543166]' },
+  status: { icon: WifiOff, badge: 'bg-[#FCEBE7] text-[#963826]' },
+  error: { icon: AlertCircle, badge: 'bg-[#FCEBE7] text-[#963826]' },
+  gameover: { icon: Trophy, badge: 'bg-[#FDF3D7] text-[#7D530B]' },
 };
 
 function formatTime(ts: number): string {
@@ -49,25 +49,25 @@ export function EventLogPanel({ logs }: EventLogPanelProps) {
   }, [logs]);
 
   return (
-    <section className="rounded-3xl border-2 border-slate-200 bg-white/95 p-4 shadow-lg">
-      <div className="mb-3 flex items-center justify-between">
+    <section className="surface-card rounded-2xl p-4">
+      <div className="mb-2.5 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <ScrollText className="h-4 w-4 text-indigo-600" />
-          <h3 className="font-display text-base font-bold text-slate-900">
-            Log Kejadian Real-Time
+          <ScrollText className="h-4 w-4 text-[#645A4E]" />
+          <h3 className="font-display text-sm font-bold text-[#1F1B17]">
+            Log Kejadian
           </h3>
         </div>
-        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500">
+        <span className="font-code text-[10px] font-bold text-[#645A4E]">
           {logs.length} entri
         </span>
       </div>
 
       <div
         ref={scrollRef}
-        className="max-h-56 space-y-2 overflow-y-auto pr-1 sm:max-h-64"
+        className="max-h-52 space-y-1.5 overflow-y-auto pr-1 sm:max-h-56"
       >
         {logs.length === 0 ? (
-          <p className="py-6 text-center text-xs font-medium text-slate-400">
+          <p className="py-5 text-center text-xs font-medium text-[#8A7F72]">
             Belum ada aktivitas permainan.
           </p>
         ) : (
@@ -77,18 +77,18 @@ export function EventLogPanel({ logs }: EventLogPanelProps) {
             return (
               <div
                 key={entry.id}
-                className="flex items-start gap-2 rounded-xl bg-slate-50/80 p-2 text-xs border border-slate-100"
+                className="flex items-start gap-2 rounded-lg border border-[#EDE5D7] bg-[#FAF6EE]/80 px-2.5 py-2 text-xs"
               >
                 <span
-                  className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-lg ${meta.badge}`}
+                  className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded ${meta.badge}`}
                 >
                   <Icon className="h-3 w-3" />
                 </span>
                 <div className="min-w-0 flex-1">
-                  <p className="font-medium text-slate-800 leading-snug">
+                  <p className="font-medium text-[#1F1B17] leading-snug">
                     {entry.message}
                   </p>
-                  <span className="text-[10px] font-semibold text-slate-400">
+                  <span className="font-code text-[10px] text-[#8A7F72]">
                     {formatTime(entry.timestamp)}
                   </span>
                 </div>

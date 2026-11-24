@@ -4,57 +4,55 @@ export interface PlayerPalette {
   name: string;
   bg: string;
   border: string;
-  ring: string;
-  badgeBg: string;
-  badgeText: string;
+  text: string;
+  tintBg: string;
   hex: string;
 }
 
+/**
+ * 5 warna pion bergaya token kayu board-game modern dengan kontras tinggi
+ * di atas permukaan papan hangat #FAF6EE.
+ */
 export const PLAYER_PALETTES: PlayerPalette[] = [
   {
-    name: 'Coral',
-    bg: 'bg-rose-500',
-    border: 'border-rose-700',
-    ring: 'ring-rose-300',
-    badgeBg: 'bg-rose-100',
-    badgeText: 'text-rose-800',
-    hex: '#f43f5e',
+    name: 'Vermilion',
+    bg: 'bg-[#D6453A]',
+    border: 'border-[#9B2C24]',
+    text: 'text-[#9B2C24]',
+    tintBg: 'bg-[#FDECEB]',
+    hex: '#D6453A',
   },
   {
-    name: 'Sky',
-    bg: 'bg-sky-500',
-    border: 'border-sky-700',
-    ring: 'ring-sky-300',
-    badgeBg: 'bg-sky-100',
-    badgeText: 'text-sky-800',
-    hex: '#0ea5e9',
+    name: 'Cobalt',
+    bg: 'bg-[#2B6CB0]',
+    border: 'border-[#1E4B7A]',
+    text: 'text-[#1E4B7A]',
+    tintBg: 'bg-[#EAF2FB]',
+    hex: '#2B6CB0',
   },
   {
-    name: 'Emerald',
-    bg: 'bg-emerald-500',
-    border: 'border-emerald-700',
-    ring: 'ring-emerald-300',
-    badgeBg: 'bg-emerald-100',
-    badgeText: 'text-emerald-800',
-    hex: '#10b981',
+    name: 'Forest',
+    bg: 'bg-[#2F855A]',
+    border: 'border-[#1F5C3D]',
+    text: 'text-[#1F5C3D]',
+    tintBg: 'bg-[#E6F4EC]',
+    hex: '#2F855A',
   },
   {
-    name: 'Violet',
-    bg: 'bg-violet-500',
-    border: 'border-violet-700',
-    ring: 'ring-violet-300',
-    badgeBg: 'bg-violet-100',
-    badgeText: 'text-violet-800',
-    hex: '#8b5cf6',
+    name: 'Plum',
+    bg: 'bg-[#7B4B94]',
+    border: 'border-[#543166]',
+    text: 'text-[#543166]',
+    tintBg: 'bg-[#F3ECF7]',
+    hex: '#7B4B94',
   },
   {
-    name: 'Amber',
-    bg: 'bg-amber-500',
-    border: 'border-amber-700',
-    ring: 'ring-amber-300',
-    badgeBg: 'bg-amber-100',
-    badgeText: 'text-amber-800',
-    hex: '#f59e0b',
+    name: 'Ochre',
+    bg: 'bg-[#C9821E]',
+    border: 'border-[#8C5810]',
+    text: 'text-[#8C5810]',
+    tintBg: 'bg-[#FCF3E3]',
+    hex: '#C9821E',
   },
 ];
 
@@ -89,13 +87,14 @@ export function getTileCoords(tileNumber: number): TileGridCoords {
 }
 
 /**
- * Titik tengah petak dalam koordinat SVG 1000x1000 (tiap petak 100x100).
+ * Titik jangkar SVG (1000x1000) sedikit bergeser ke bawah-kanan dari pojok kiri-atas
+ * agar angka nomor petak di sudut kiri-atas tidak pernah tertutup ujung ular/tangga.
  */
 export function getTileCenterSvg(tileNumber: number): { x: number; y: number } {
   const { visualRow, col } = getTileCoords(tileNumber);
   return {
-    x: col * 100 + 50,
-    y: visualRow * 100 + 50,
+    x: col * 100 + 54,
+    y: visualRow * 100 + 58,
   };
 }
 
@@ -109,7 +108,7 @@ export function getTileCenterPercent(tileNumber: number): {
   const { visualRow, col } = getTileCoords(tileNumber);
   return {
     leftPct: col * 10 + 5,
-    topPct: visualRow * 10 + 5,
+    topPct: visualRow * 10 + 5.6,
   };
 }
 
@@ -148,24 +147,24 @@ export function getPawnClusterOffset(
 
   if (totalInTile === 2) {
     return slotIndex === 0
-      ? { dxPct: -1.8, dyPct: 0.6 }
-      : { dxPct: 1.8, dyPct: -0.6 };
+      ? { dxPct: -1.7, dyPct: 0.6 }
+      : { dxPct: 1.7, dyPct: -0.6 };
   }
 
   if (totalInTile === 3) {
     const positions = [
-      { dxPct: 0, dyPct: -1.9 },
-      { dxPct: -2.0, dyPct: 1.6 },
-      { dxPct: 2.0, dyPct: 1.6 },
+      { dxPct: 0, dyPct: -1.8 },
+      { dxPct: -1.9, dyPct: 1.5 },
+      { dxPct: 1.9, dyPct: 1.5 },
     ];
     return positions[slotIndex % 3];
   }
 
   const positions = [
-    { dxPct: -2.0, dyPct: -1.8 },
-    { dxPct: 2.0, dyPct: -1.8 },
-    { dxPct: -2.0, dyPct: 1.8 },
-    { dxPct: 2.0, dyPct: 1.8 },
+    { dxPct: -1.9, dyPct: -1.7 },
+    { dxPct: 1.9, dyPct: -1.7 },
+    { dxPct: -1.9, dyPct: 1.7 },
+    { dxPct: 1.9, dyPct: 1.7 },
     { dxPct: 0, dyPct: 0 },
   ];
   return positions[slotIndex % 5];

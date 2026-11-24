@@ -47,15 +47,15 @@ export function GameArenaPage({
   const players = room?.players ?? [];
 
   return (
-    <div className="mx-auto max-w-7xl px-3 py-4 sm:px-6 sm:py-6">
-      {/* Compact Match Info Bar */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-amber-200 bg-white/85 px-4 py-2.5 shadow-sm backdrop-blur-sm">
-        <div className="flex items-center gap-3 text-xs font-bold text-slate-700">
-          <span className="rounded-lg bg-amber-100 px-2.5 py-1 font-code text-amber-900">
+    <div className="mx-auto max-w-7xl px-3 py-4 sm:px-6 sm:py-5">
+      {/* Bar Info Ringkas */}
+      <div className="surface-card mb-4 flex flex-wrap items-center justify-between gap-2 rounded-xl px-3.5 py-2">
+        <div className="flex items-center gap-3 text-xs font-semibold text-[#5A5045]">
+          <span className="rounded-md border border-[#E7CB82] bg-[#FDF3D7] px-2 py-0.5 font-code font-bold text-[#7D530B]">
             ROOM {room?.roomCode ?? '------'}
           </span>
-          <span className="inline-flex items-center gap-1 text-slate-600">
-            <Users className="h-3.5 w-3.5 text-indigo-500" />
+          <span className="inline-flex items-center gap-1">
+            <Users className="h-3.5 w-3.5 text-[#2F7D57]" />
             {players.length} Pemain
           </span>
         </div>
@@ -63,17 +63,16 @@ export function GameArenaPage({
         <button
           type="button"
           onClick={onLeaveRoom}
-          className="inline-flex items-center gap-1 rounded-xl border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-extrabold text-rose-700 hover:bg-rose-100 cursor-pointer"
+          className="inline-flex items-center gap-1 rounded-lg border border-[#ECC1B7] bg-[#FCEBE7] px-2.5 py-1 text-xs font-bold text-[#963826] hover:bg-[#F8DDD6] cursor-pointer"
         >
           <LogOut className="h-3.5 w-3.5" />
           <span>Keluar</span>
         </button>
       </div>
 
-      {/* Main Arena Layout: Board (left/top) + Controls & Logs (right/bottom) */}
+      {/* Hierarki Utama: Papan 10x10 Mendominasi (lg:col-span-8), Kontrol Ringkas (lg:col-span-4) */}
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-12 lg:items-start">
-        {/* Board Column */}
-        <div className="lg:col-span-7 xl:col-span-8 space-y-3">
+        <div className="lg:col-span-8 space-y-3">
           <AnswerResultBanner result={lastAnswerResult} players={players} />
           <GameBoard
             board={board}
@@ -85,8 +84,7 @@ export function GameArenaPage({
           />
         </div>
 
-        {/* Control + Event Log Column */}
-        <div className="lg:col-span-5 xl:col-span-4 space-y-4">
+        <aside className="lg:col-span-4 space-y-3.5">
           <DiceControlPanel
             players={players}
             positions={positions}
@@ -99,7 +97,7 @@ export function GameArenaPage({
           />
 
           <EventLogPanel logs={logs} />
-        </div>
+        </aside>
       </div>
     </div>
   );

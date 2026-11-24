@@ -4,7 +4,7 @@ import {
   CheckCircle2,
   Clock,
   Eye,
-  Sparkles,
+  Loader2,
   XCircle,
 } from 'lucide-react';
 import type {
@@ -23,10 +23,10 @@ interface QuestionModalProps {
 const CHOICES: QuizChoice[] = ['A', 'B', 'C', 'D'];
 
 const CHOICE_BADGE: Record<QuizChoice, string> = {
-  A: 'bg-sky-500 text-white',
-  B: 'bg-emerald-500 text-white',
-  C: 'bg-amber-500 text-white',
-  D: 'bg-rose-500 text-white',
+  A: 'bg-[#2B6CB0] text-[#FFFDF8]',
+  B: 'bg-[#2F7D57] text-[#FFFDF8]',
+  C: 'bg-[#C4881A] text-[#FFFDF8]',
+  D: 'bg-[#C8523B] text-[#FFFDF8]',
 };
 
 export function QuestionModal({
@@ -73,39 +73,39 @@ export function QuestionModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#1F1B17]/60 p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="quiz-modal-title"
     >
-      <div className="animate-toast-enter w-full max-w-xl overflow-hidden rounded-3xl border-4 border-violet-300 bg-white shadow-2xl">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-violet-600 via-indigo-600 to-sky-600 p-5 text-white">
+      <div className="animate-toast-enter w-full max-w-xl overflow-hidden rounded-2xl border-2 border-[#352517] bg-[#FFFDF8] shadow-[0_8px_0_0_#352517]">
+        {/* Header Kartu Kuis (Mustard Editorial Tabletop) */}
+        <div className="border-b-2 border-[#D9B65E] bg-[#F8E7B4] p-4 sm:p-5 text-[#1F1B17]">
           <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/20">
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-[#B7791F] bg-[#FFFDF8] text-[#B7791F]">
                 <Brain className="h-5 w-5" />
               </span>
               <div>
-                <p className="text-[11px] font-bold uppercase tracking-wider text-violet-100">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-[#7D530B]">
                   {question.category ?? 'Kuis IT — Petak Soal'}
                 </p>
                 <h2
                   id="quiz-modal-title"
-                  className="font-display text-lg font-bold leading-tight"
+                  className="font-display text-lg font-extrabold leading-tight"
                 >
                   {isAnswering
-                    ? 'Giliran Anda Menjawab!'
+                    ? 'Giliran Anda Menjawab'
                     : `${targetName} sedang menjawab soal...`}
                 </h2>
               </div>
             </div>
 
             <div
-              className={`inline-flex items-center gap-1 rounded-xl px-3 py-1.5 font-code text-sm font-bold ${
+              className={`inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 font-code text-sm font-bold ${
                 isUrgent
-                  ? 'bg-rose-500 text-white animate-pulse'
-                  : 'bg-white/20 text-white'
+                  ? 'border-[#963826] bg-[#C8523B] text-[#FFFDF8]'
+                  : 'border-[#B7791F]/40 bg-[#FFFDF8] text-[#1F1B17]'
               }`}
             >
               <Clock className="h-4 w-4" />
@@ -113,34 +113,32 @@ export function QuestionModal({
             </div>
           </div>
 
-          {/* 20s Countdown Bar */}
-          <div className="mt-3.5 h-2 w-full overflow-hidden rounded-full bg-white/25">
+          <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-[#E5CF90]">
             <div
               style={{ width: `${progressPct}%` }}
               className={`h-full rounded-full transition-all duration-100 ${
-                isUrgent ? 'bg-rose-300' : 'bg-amber-300'
+                isUrgent ? 'bg-[#C8523B]' : 'bg-[#2F7D57]'
               }`}
             />
           </div>
         </div>
 
-        {/* Body */}
-        <div className="p-5 sm:p-6 space-y-5">
+        {/* Isi Soal */}
+        <div className="p-5 sm:p-6 space-y-4">
           {!isAnswering && (
-            <div className="flex items-center gap-2 rounded-2xl border border-sky-200 bg-sky-50 px-3.5 py-2.5 text-xs font-bold text-sky-900">
-              <Eye className="h-4 w-4 shrink-0 text-sky-600" />
+            <div className="flex items-center gap-2 rounded-xl border border-[#C5D8EC] bg-[#EAF2FB] px-3.5 py-2.5 text-xs font-semibold text-[#1E4B7A]">
+              <Eye className="h-4 w-4 shrink-0" />
               <span>
-                Mode Penonton: <strong>{targetName}</strong> sedang menjawab
-                soal. Hasil akan terlihat dari perubahan posisi pion.
+                Mode Penonton: <strong>{targetName}</strong> sedang memilih
+                jawaban. Hasil terlihat dari pergerakan pion.
               </span>
             </div>
           )}
 
-          <p className="text-base font-bold text-slate-900 leading-relaxed sm:text-lg">
+          <p className="text-base font-bold text-[#1F1B17] leading-relaxed sm:text-lg">
             {question.prompt}
           </p>
 
-          {/* Options A-D */}
           <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
             {CHOICES.map((choice) => {
               const isPicked = selectedChoice === choice;
@@ -150,20 +148,20 @@ export function QuestionModal({
                   type="button"
                   disabled={!isAnswering || selectedChoice !== null}
                   onClick={() => handleSelect(choice)}
-                  className={`btn-tactile flex items-center gap-3 rounded-2xl border-2 p-3.5 text-left transition-all ${
+                  className={`btn-tactile flex items-center gap-3 rounded-xl border-[1.5px] p-3 text-left transition-colors ${
                     isPicked
-                      ? 'border-violet-600 bg-violet-50 ring-4 ring-violet-200'
+                      ? 'border-[#1F1B17] bg-[#FDF3D7] shadow-[0_2px_0_0_#1F1B17]'
                       : isAnswering
-                        ? 'border-slate-200 bg-slate-50/70 hover:border-violet-400 hover:bg-violet-50/60 cursor-pointer'
-                        : 'border-slate-200/70 bg-slate-50/60 opacity-85 cursor-default'
+                        ? 'border-[#DDD2C0] bg-[#FAF6EE] shadow-[0_2px_0_0_#E2D7C4] hover:border-[#1F1B17] hover:bg-[#FFFDF8] cursor-pointer'
+                        : 'border-[#E6DDD0] bg-[#FAF6EE]/70 opacity-85 cursor-default'
                   }`}
                 >
                   <span
-                    className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl font-display text-sm font-bold shadow-sm ${CHOICE_BADGE[choice]}`}
+                    className={`flex h-7.5 w-7.5 shrink-0 items-center justify-center rounded-lg font-display text-sm font-extrabold ${CHOICE_BADGE[choice]}`}
                   >
                     {choice}
                   </span>
-                  <span className="text-sm font-bold text-slate-800 leading-snug">
+                  <span className="text-sm font-semibold text-[#1F1B17] leading-snug">
                     {question.options[choice]}
                   </span>
                 </button>
@@ -172,10 +170,10 @@ export function QuestionModal({
           </div>
 
           {isAnswering && selectedChoice && (
-            <p className="flex items-center justify-center gap-1.5 text-xs font-bold text-violet-700">
-              <Sparkles className="h-4 w-4 animate-spin" />
+            <p className="flex items-center justify-center gap-1.5 text-xs font-bold text-[#7D530B]">
+              <Loader2 className="h-4 w-4 animate-spin" />
               <span>
-                Pilihan {selectedChoice} terkirim! Menunggu evaluasi server...
+                Pilihan {selectedChoice} terkirim — menunggu evaluasi server...
               </span>
             </p>
           )}
@@ -216,21 +214,21 @@ export function AnswerResultBanner({
 
   return (
     <div
-      className={`animate-toast-enter flex items-center gap-3 rounded-2xl border-2 px-4 py-3 text-xs font-bold shadow-md sm:text-sm ${
+      className={`animate-toast-enter flex items-center gap-3 rounded-xl border-[1.5px] px-4 py-2.5 text-xs font-bold sm:text-sm ${
         isSuccess
-          ? 'border-emerald-300 bg-emerald-50 text-emerald-900'
-          : 'border-rose-300 bg-rose-50 text-rose-900'
+          ? 'border-[#BBDAC8] bg-[#E6F2EB] text-[#1D5439]'
+          : 'border-[#ECC1B7] bg-[#FCEBE7] text-[#8F2F1E]'
       }`}
     >
       {isSuccess ? (
-        <CheckCircle2 className="h-5 w-5 shrink-0 text-emerald-600" />
+        <CheckCircle2 className="h-4.5 w-4.5 shrink-0 text-[#2F7D57]" />
       ) : (
-        <XCircle className="h-5 w-5 shrink-0 text-rose-600" />
+        <XCircle className="h-4.5 w-4.5 shrink-0 text-[#C8523B]" />
       )}
       <div className="flex-1">
         <p>
           {isSuccess
-            ? `${playerName} maju +${result.bonusDice} petak (${result.from} → ${result.to})!`
+            ? `${playerName} maju +${result.bonusDice} petak (${result.from} → ${result.to}).`
             : `${playerName} mundur -${result.bonusDice} petak (${result.from} → ${result.to}).`}
         </p>
         {isSpectatorInference && (

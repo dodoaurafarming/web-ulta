@@ -36,7 +36,7 @@ function DiceVisual({
 
   return (
     <div
-      className={`relative flex h-20 w-20 items-center justify-center rounded-2xl border-4 border-amber-300 bg-gradient-to-br from-white via-amber-50 to-amber-100 p-2.5 shadow-[0_6px_0_0_#d97706,0_12px_20px_-4px_rgba(217,119,6,0.35)] ${
+      className={`relative flex h-16 w-16 shrink-0 items-center justify-center rounded-xl border-2 border-[#C7B8A1] bg-[#FFFDF8] p-2 shadow-[0_4px_0_0_#C7B8A1] ${
         rolling ? 'animate-dice-tumble' : ''
       }`}
       aria-label={`Dadu bernilai ${safeVal}`}
@@ -45,11 +45,11 @@ function DiceVisual({
         {Array.from({ length: 9 }).map((_, idx) => (
           <span
             key={idx}
-            className={`h-3 w-3 rounded-full transition-all ${
+            className={`h-2.5 w-2.5 rounded-full ${
               pips.includes(idx)
                 ? safeVal === 6
-                  ? 'bg-rose-500 shadow-inner'
-                  : 'bg-slate-800 shadow-inner'
+                  ? 'bg-[#C8523B]'
+                  : 'bg-[#1F1B17]'
                 : 'bg-transparent'
             }`}
           />
@@ -74,7 +74,6 @@ export function DiceControlPanel({
   );
   const [rollingAnim, setRollingAnim] = useState(false);
 
-  // Countdown visual 10 detik untuk giliran aktif
   useEffect(() => {
     if (!currentTurn) {
       setRemainingSec(0);
@@ -92,11 +91,10 @@ export function DiceControlPanel({
     return () => clearInterval(interval);
   }, [currentTurn]);
 
-  // Animasi dadu singkat saat MOVE diterima
   useEffect(() => {
     if (!lastMove) return;
     setRollingAnim(true);
-    const timer = setTimeout(() => setRollingAnim(false), 550);
+    const timer = setTimeout(() => setRollingAnim(false), 500);
     return () => clearTimeout(timer);
   }, [lastMove]);
 
@@ -108,44 +106,44 @@ export function DiceControlPanel({
     : null;
   const deadline = currentTurn?.deadline ?? 10;
   const progressPct =
-    deadline > 0 ? Math.max(0, Math.min(100, (remainingSec / deadline) * 100)) : 0;
+    deadline > 0
+      ? Math.max(0, Math.min(100, (remainingSec / deadline) * 100))
+      : 0;
   const isUrgent = remainingSec <= 3 && remainingSec > 0;
 
   const handleRollClick = () => {
     if (!isMyTurn || hasActiveQuestion) return;
     setRollingAnim(true);
     onRollDice();
-    setTimeout(() => setRollingAnim(false), 600);
+    setTimeout(() => setRollingAnim(false), 550);
   };
 
   return (
-    <div className="space-y-4">
-      {/* Turn & Dice Card */}
+    <div className="space-y-3.5">
+      {/* Kartu Giliran & Dadu */}
       <section
-        className={`rounded-3xl border-2 bg-white/95 p-4 shadow-xl transition-all sm:p-5 ${
-          isMyTurn
-            ? 'border-amber-400 ring-4 ring-amber-200/70'
-            : 'border-slate-200'
+        className={`surface-card rounded-2xl p-4 transition-colors ${
+          isMyTurn ? 'border-[#C8523B] ring-2 ring-[#C8523B]/20' : ''
         }`}
       >
-        {/* Active Turn Header */}
+        {/* Header Giliran */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2.5 min-w-0">
             {activePalette && (
               <span
-                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border-2 text-white font-display text-sm font-bold shadow ${activePalette.bg} ${activePalette.border}`}
+                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-[#FFFDF8] text-[#FFFDF8] font-display text-xs font-extrabold shadow-sm ${activePalette.bg}`}
               >
                 {activePlayer?.name.slice(0, 1).toUpperCase()}
               </span>
             )}
             <div className="min-w-0">
-              <p className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-[#645A4E]">
                 Giliran Aktif
               </p>
-              <p className="truncate font-display text-lg font-bold text-slate-900">
+              <p className="truncate font-display text-base font-bold text-[#1F1B17]">
                 {activePlayer
                   ? activePlayer.playerId === myPlayerId
-                    ? `${activePlayer.name} (Giliran Anda!)`
+                    ? `${activePlayer.name} — Giliran Anda`
                     : activePlayer.name
                   : 'Menunggu giliran...'}
               </p>
@@ -153,10 +151,10 @@ export function DiceControlPanel({
           </div>
 
           <div
-            className={`inline-flex shrink-0 items-center gap-1 rounded-xl px-2.5 py-1 font-code text-xs font-bold ${
+            className={`inline-flex shrink-0 items-center gap-1 rounded-lg border px-2 py-1 font-code text-xs font-bold ${
               isUrgent
-                ? 'bg-rose-100 text-rose-700 animate-pulse'
-                : 'bg-amber-100 text-amber-900'
+                ? 'border-[#ECC1B7] bg-[#FCEBE7] text-[#963826]'
+                : 'border-[#E7CB82] bg-[#FDF3D7] text-[#7D530B]'
             }`}
           >
             <Clock className="h-3.5 w-3.5" />
@@ -164,61 +162,65 @@ export function DiceControlPanel({
           </div>
         </div>
 
-        {/* 10s Countdown Progress Bar */}
-        <div className="mt-3 h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+        {/* Countdown Bar 10 Detik */}
+        <div className="mt-2.5 h-2 w-full overflow-hidden rounded-full bg-[#ECE3D3]">
           <div
             style={{ width: `${progressPct}%` }}
             className={`h-full rounded-full transition-all duration-100 ${
-              isUrgent
-                ? 'bg-gradient-to-r from-rose-500 to-red-600'
-                : 'bg-gradient-to-r from-amber-400 to-orange-500'
+              isUrgent ? 'bg-[#C8523B]' : 'bg-[#2F7D57]'
             }`}
           />
         </div>
 
-        {/* Dice + Roll Button */}
-        <div className="mt-4 flex flex-col items-center gap-4 rounded-2xl bg-amber-50/70 p-4 border border-amber-100 sm:flex-row sm:justify-between">
-          <div className="flex items-center gap-3.5">
+        {/* Area Dadu & Tombol ROLL */}
+        <div className="surface-inset mt-3.5 flex items-center justify-between gap-3 rounded-xl p-3">
+          <div className="flex items-center gap-3 min-w-0">
             <DiceVisual value={lastMove?.dice ?? 1} rolling={rollingAnim} />
-            <div className="text-left">
-              <p className="text-xs font-extrabold uppercase tracking-wider text-slate-500">
-                Dadu Terakhir
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-[#645A4E]">
+                Hasil Dadu
               </p>
-              <p className="font-display text-2xl font-bold text-slate-900">
-                {lastMove ? `Angka ${lastMove.dice}` : 'Siap Lempar'}
+              <p className="font-display text-xl font-extrabold text-[#1F1B17] leading-tight">
+                {lastMove ? `Angka ${lastMove.dice}` : 'Siap'}
               </p>
               {lastMove?.dice === 6 && (
-                <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-extrabold text-rose-700">
+                <span className="mt-0.5 inline-flex items-center gap-1 rounded bg-[#FCEBE7] px-1.5 py-0.5 text-[10px] font-bold text-[#963826]">
                   <Sparkles className="h-3 w-3" />
-                  Bonus Giliran!
+                  Giliran Ekstra
                 </span>
               )}
             </div>
           </div>
-
-          <button
-            type="button"
-            onClick={handleRollClick}
-            disabled={!isMyTurn || hasActiveQuestion}
-            className="btn-tactile flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-orange-500 via-rose-500 to-pink-500 px-5 py-3.5 text-sm font-extrabold text-white shadow-[0_4px_0_0_#be123c] hover:from-orange-600 hover:to-pink-600 cursor-pointer disabled:cursor-not-allowed disabled:from-slate-300 disabled:via-slate-300 disabled:to-slate-300 disabled:text-slate-500 disabled:shadow-none sm:w-auto"
-          >
-            <Dices className="h-5 w-5" />
-            <span>
-              {hasActiveQuestion
-                ? 'Kuis Aktif...'
-                : isMyTurn
-                  ? 'Lempar Dadu'
-                  : 'Tunggu Giliran'}
-            </span>
-          </button>
         </div>
+
+        <button
+          type="button"
+          onClick={handleRollClick}
+          disabled={!isMyTurn || hasActiveQuestion}
+          className="btn-tactile mt-3 flex w-full items-center justify-center gap-2 rounded-xl border-[1.5px] border-[#963826] bg-[#C8523B] px-4 py-3 text-sm font-bold text-[#FFFDF8] shadow-[0_3px_0_0_#963826] hover:bg-[#B54731] cursor-pointer disabled:cursor-not-allowed disabled:border-[#D9CEBC] disabled:bg-[#EBE3D5] disabled:text-[#8A7F72] disabled:shadow-none"
+        >
+          <Dices className="h-4.5 w-4.5" />
+          <span>
+            {hasActiveQuestion
+              ? 'Kuis Sedang Berlangsung...'
+              : isMyTurn
+                ? 'Lempar Dadu'
+                : 'Menunggu Giliran'}
+          </span>
+        </button>
       </section>
 
-      {/* Player Standings Strip */}
-      <section className="rounded-3xl border-2 border-slate-200 bg-white/95 p-4 shadow-lg">
-        <h3 className="mb-3 font-display text-base font-bold text-slate-900">
-          Posisi Pemain
-        </h3>
+      {/* Daftar Posisi Pemain Ringkas */}
+      <section className="surface-card rounded-2xl p-4">
+        <div className="mb-2.5 flex items-center justify-between">
+          <h3 className="font-display text-sm font-bold text-[#1F1B17]">
+            Posisi Pemain
+          </h3>
+          <span className="text-[11px] font-semibold text-[#645A4E]">
+            Target 100
+          </span>
+        </div>
+
         <div className="space-y-2">
           {players.map((player) => {
             const pos = positions[player.playerId] ?? player.position ?? 1;
@@ -229,35 +231,35 @@ export function DiceControlPanel({
             return (
               <div
                 key={player.playerId}
-                className={`rounded-2xl border p-2.5 transition-all ${
+                className={`rounded-xl border px-2.5 py-2 transition-colors ${
                   isTurn
-                    ? 'border-amber-400 bg-amber-50/80'
-                    : 'border-slate-100 bg-slate-50/60'
+                    ? 'border-[#C8523B]/60 bg-[#FCF5EE]'
+                    : 'border-[#E8DFD0] bg-[#FAF6EE]/70'
                 }`}
               >
                 <div className="flex items-center justify-between gap-2 text-xs">
                   <div className="flex items-center gap-2 min-w-0">
                     <span
-                      className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white ${palette.bg}`}
+                      className={`flex h-5.5 w-5.5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-[#FFFDF8] ${palette.bg}`}
                     >
                       {player.name.slice(0, 1).toUpperCase()}
                     </span>
-                    <span className="truncate font-bold text-slate-800">
+                    <span className="truncate font-semibold text-[#1F1B17]">
                       {player.name}
                       {isMe ? ' (Anda)' : ''}
                     </span>
                     {!player.online && (
-                      <span className="inline-flex items-center gap-0.5 rounded bg-rose-100 px-1.5 py-0.5 text-[10px] font-bold text-rose-700">
+                      <span className="inline-flex items-center gap-0.5 rounded bg-[#FCEBE7] px-1.5 py-0.5 text-[10px] font-bold text-[#963826]">
                         <WifiOff className="h-2.5 w-2.5" />
                         Offline
                       </span>
                     )}
                   </div>
-                  <span className="font-code text-xs font-bold text-slate-700">
-                    Petak {pos}/100
+                  <span className="font-code text-xs font-bold text-[#5A5045]">
+                    {pos}/100
                   </span>
                 </div>
-                <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-200/80">
+                <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-[#E8DFD0]">
                   <div
                     style={{ width: `${pos}%` }}
                     className={`h-full rounded-full transition-all duration-300 ${palette.bg}`}

@@ -139,50 +139,323 @@ const MOCK_QUESTIONS: MockQuestionRecord[] = [
 
 const BOT_NAMES = ['Bot-Raka', 'Bot-Nadia', 'Bot-Dimas', 'Bot-Sinta'];
 
+interface GridPoint {
+  tile: number;
+  row: number;
+  col: number;
+}
+
+function tileToGridPoint(tile: number): GridPoint {
+  const row = Math.floor((tile - 1) / 10);
+  const colInRow = (tile - 1) % 10;
+  const col = row % 2 === 1 ? 9 - colInRow : colInRow;
+  return { tile, row, col };
+}
+
+function chebyshevDistance(a: GridPoint, b: GridPoint): number {
+  return Math.max(Math.abs(a.row - b.row), Math.abs(a.col - b.col));
+}
+
+function cross2d(
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+  cx: number,
+  cy: number,
+): number {
+  return (bx - ax) * (cy - ay) - (by - ay) * (cx - ax);
+}
+
+function onSegment(
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+  px: number,
+  py: number,
+): boolean {
+  return (
+    px >= Math.min(ax, bx) - 1e-6 &&
+    px <= Math.max(ax, bx) + 1e-6 &&
+    py >= Math.min(ay, by) - 1e-6 &&
+    py <= Math.max(ay, by) + 1e-6
+  );
+}
+
+export function doGridSegmentsIntersect(
+  aTile: number,
+  bTile: number,
+  cTile: number,
+  dTile: number,
+): boolean {
+  const a = tileToGridPoint(aTile);
+  const b = tileToGridPoint(bTile);
+  const c = tileToGridPoint(cTile);
+  const d = tileToGridPoint(dTile);
+
+  const d1 = cross2d(a.col, a.row, b.col, b.row, c.col, c.row);
+  const d2 = cross2d(a.col, a.row, b.col, b.row, d.col, d.row);
+  const d3 = cross2d(c.col, c.row, d.col, d.row, a.col, a.row);
+  const d4 = cross2d(c.col, c.row, d.col, d.row, b.col, b.row);
+
+  if (
+    ((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) &&
+    ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))
+  ) {
+    return true;
+  }
+
+  if (Math.abs(d1) < 1e-6 && onSegment(a.col, a.row, b.col, b.row, c.col, c.row)) {
+    return true;
+  }
+  if (Math.abs(d2) < 1e-6 && onSegment(a.col, a.row, b.col, b.row, d.col, d.row)) {
+    return true;
+  }
+  if (Math.abs(d3) < 1e-6 && onSegment(c.col, c.row, d.col, d.row, a.col, a.row)) {
+    return true;
+  }
+  if (Math.abs(d4) < 1e-6 && onSegment(c.col, c.row, d.col, d.row, b.col, b.row)) {
+    return true;
+  }
+
+  return false;
+}
+
+function pointToSegmentDistance(
+  p: GridPoint,
+  a: GridPoint,
+  b: GridPoint,
+): number {
+  const dx = b.col - a.col;
+  const dy = b.row - a.row;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return Math.hypot(p.col - a.col, p.row - a.row);
+  const t = Math.max(
+    0,
+    Math.min(1, ((p.col - a.col) * dx + (p.row - a.row) * dy) / lenSq),
+  );
+  const projX = a.col + t * dx;
+  const projY = a.row + t * dy;
+  return Math.hypot(p.col - projX, p.row - projY);
+}
+
+interface PlacedPath {
+  type: 'LADDER' | 'SNAKE';
+  from: GridPoint;
+  to: GridPoint;
+}
+
+function shuffleWithRng<T>(items: T[], rng: () => number): T[] {
+  const arr = [...items];
+  for (let i = arr.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(rng() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+// Fallback terjamin sah (5 tangga, 5 ular, 6 soal, Chebyshev >= 2, anti-crossing)
+const FALLBACK_LADDERS: Array<[number, number]> = [
+  [2, 22],
+  [15, 35],
+  [33, 53],
+  [57, 84],
+  [70, 90],
+];
+
+const FALLBACK_SNAKES: Array<[number, number]> = [
+  [37, 17],
+  [50, 30],
+  [82, 62],
+  [95, 66],
+  [93, 73],
+];
+
+const FALLBACK_QUESTIONS: number[] = [7, 25, 45, 65, 78, 98];
+
+/**
+ * Generator papan Mock Mode yang lega dan terdistribusi rapi:
+ * - 5 Tangga (LADDER), 5 Ular (SNAKE), 6 Petak Soal (QUESTION), 84 Normal (petak 1 & 100 selalu NORMAL).
+ * - Tersebar merata di zona bawah, tengah, dan atas.
+ * - Jarak grid minimal 2 petak (Chebyshev >= 2) antar seluruh kepala/ekor/ujung.
+ * - Panjang lompatan wajar (1–3 baris, maksimal 1 jalur panjang 4 baris).
+ * - Filter anti-crossing agar garis ular/tangga tidak saling bersilangan.
+ */
 export function generateMockBoard(rng: () => number = Math.random): BoardCell[] {
+  const allPoints: GridPoint[] = Array.from({ length: 100 }, (_, i) =>
+    tileToGridPoint(i + 1),
+  ).filter((p) => p.tile !== 1 && p.tile !== 100);
+
+  // Rencana zona seimbang: 5 tangga + 5 ular tersebar di bawah, tengah, atas
+  const specs: Array<{
+    type: 'LADDER' | 'SNAKE';
+    minStartRow: number;
+    maxStartRow: number;
+  }> = [
+    { type: 'LADDER', minStartRow: 0, maxStartRow: 2 },
+    { type: 'LADDER', minStartRow: 1, maxStartRow: 3 },
+    { type: 'LADDER', minStartRow: 3, maxStartRow: 5 },
+    { type: 'LADDER', minStartRow: 4, maxStartRow: 6 },
+    { type: 'LADDER', minStartRow: 6, maxStartRow: 7 },
+    { type: 'SNAKE', minStartRow: 8, maxStartRow: 9 },
+    { type: 'SNAKE', minStartRow: 7, maxStartRow: 8 },
+    { type: 'SNAKE', minStartRow: 5, maxStartRow: 7 },
+    { type: 'SNAKE', minStartRow: 3, maxStartRow: 5 },
+    { type: 'SNAKE', minStartRow: 2, maxStartRow: 4 },
+  ];
+
+  const tryGenerate = (): {
+    paths: PlacedPath[];
+    questions: number[];
+  } | null => {
+    const placed: PlacedPath[] = [];
+    const endpoints: GridPoint[] = [];
+    let longJumpCount = 0;
+
+    for (const spec of specs) {
+      const startCandidates = shuffleWithRng(
+        allPoints.filter(
+          (p) =>
+            p.row >= spec.minStartRow &&
+            p.row <= spec.maxStartRow &&
+            endpoints.every((ep) => chebyshevDistance(p, ep) >= 2),
+        ),
+        rng,
+      );
+
+      let chosen: PlacedPath | null = null;
+
+      for (const start of startCandidates) {
+        const maxDeltaRow = longJumpCount < 1 ? 4 : 3;
+        const endCandidates = shuffleWithRng(
+          allPoints.filter((end) => {
+            if (spec.type === 'LADDER') {
+              if (end.tile <= start.tile) return false;
+              const dr = end.row - start.row;
+              if (dr < 1 || dr > maxDeltaRow) return false;
+            } else {
+              if (end.tile >= start.tile) return false;
+              const dr = start.row - end.row;
+              if (dr < 1 || dr > maxDeltaRow) return false;
+            }
+
+            if (Math.abs(end.col - start.col) > 4) return false;
+            if (chebyshevDistance(start, end) < 2) return false;
+            if (endpoints.some((ep) => chebyshevDistance(end, ep) < 2)) {
+              return false;
+            }
+
+            // Anti-crossing & jarak bersih dari endpoint jalur lain
+            for (const existing of placed) {
+              if (
+                doGridSegmentsIntersect(
+                  start.tile,
+                  end.tile,
+                  existing.from.tile,
+                  existing.to.tile,
+                )
+              ) {
+                return false;
+              }
+              if (
+                pointToSegmentDistance(existing.from, start, end) < 0.45 ||
+                pointToSegmentDistance(existing.to, start, end) < 0.45 ||
+                pointToSegmentDistance(start, existing.from, existing.to) < 0.45 ||
+                pointToSegmentDistance(end, existing.from, existing.to) < 0.45
+              ) {
+                return false;
+              }
+            }
+
+            return true;
+          }),
+          rng,
+        );
+
+        if (endCandidates.length > 0) {
+          const preferred =
+            endCandidates.find(
+              (end) => Math.abs(end.row - start.row) <= 3,
+            ) ?? endCandidates[0];
+          chosen = { type: spec.type, from: start, to: preferred };
+          break;
+        }
+      }
+
+      if (!chosen) return null;
+      if (Math.abs(chosen.to.row - chosen.from.row) === 4) {
+        longJumpCount += 1;
+      }
+      placed.push(chosen);
+      endpoints.push(chosen.from, chosen.to);
+    }
+
+    // Tempatkan 6 petak soal (2 bawah, 2 tengah, 2 atas), tidak tumpang tindih & berjarak
+    const questionZones: Array<[number, number]> = [
+      [0, 2],
+      [0, 2],
+      [3, 6],
+      [3, 6],
+      [7, 9],
+      [7, 9],
+    ];
+    const usedEndpointTiles = new Set(endpoints.map((ep) => ep.tile));
+    const questionPoints: GridPoint[] = [];
+
+    for (const [minRow, maxRow] of questionZones) {
+      const candidates = shuffleWithRng(
+        allPoints.filter(
+          (p) =>
+            p.row >= minRow &&
+            p.row <= maxRow &&
+            !usedEndpointTiles.has(p.tile) &&
+            questionPoints.every((qp) => chebyshevDistance(p, qp) >= 2),
+        ),
+        rng,
+      );
+      if (candidates.length === 0) return null;
+      questionPoints.push(candidates[0]);
+    }
+
+    return {
+      paths: placed,
+      questions: questionPoints.map((q) => q.tile),
+    };
+  };
+
+  let layout: { paths: PlacedPath[]; questions: number[] } | null = null;
+  for (let attempt = 0; attempt < 250; attempt += 1) {
+    layout = tryGenerate();
+    if (layout) break;
+  }
+
   const cells: BoardCell[] = Array.from({ length: 100 }, (_, i) => ({
     index: i + 1,
     type: 'NORMAL' as TileEffect,
   }));
 
-  const used = new Set<number>([1, 100]);
-
-  const pickUnused = (min: number, max: number): number => {
-    const candidates: number[] = [];
-    for (let n = min; n <= max; n += 1) {
-      if (!used.has(n)) candidates.push(n);
+  if (layout) {
+    for (const path of layout.paths) {
+      cells[path.from.tile - 1] = {
+        index: path.from.tile,
+        type: path.type,
+        to: path.to.tile,
+      };
     }
-    const idx = Math.floor(rng() * candidates.length);
-    return candidates[idx];
-  };
-
-  // 8 Ular (SNAKE: to < n)
-  for (let i = 0; i < 8; i += 1) {
-    const head = pickUnused(22, 98);
-    used.add(head);
-    const minTail = Math.max(2, head - 35);
-    const maxTail = Math.max(2, head - 8);
-    const tail =
-      minTail + Math.floor(rng() * Math.max(1, maxTail - minTail + 1));
-    cells[head - 1] = { index: head, type: 'SNAKE', to: tail };
-  }
-
-  // 8 Tangga (LADDER: to > n)
-  for (let i = 0; i < 8; i += 1) {
-    const base = pickUnused(3, 78);
-    used.add(base);
-    const minTop = Math.min(99, base + 8);
-    const maxTop = Math.min(99, base + 32);
-    const top =
-      minTop + Math.floor(rng() * Math.max(1, maxTop - minTop + 1));
-    cells[base - 1] = { index: base, type: 'LADDER', to: top };
-  }
-
-  // 10 Petak Soal (QUESTION)
-  for (let i = 0; i < 10; i += 1) {
-    const tile = pickUnused(4, 96);
-    used.add(tile);
-    cells[tile - 1] = { index: tile, type: 'QUESTION' };
+    for (const qTile of layout.questions) {
+      cells[qTile - 1] = { index: qTile, type: 'QUESTION' };
+    }
+  } else {
+    for (const [from, to] of FALLBACK_LADDERS) {
+      cells[from - 1] = { index: from, type: 'LADDER', to };
+    }
+    for (const [from, to] of FALLBACK_SNAKES) {
+      cells[from - 1] = { index: from, type: 'SNAKE', to };
+    }
+    for (const qTile of FALLBACK_QUESTIONS) {
+      cells[qTile - 1] = { index: qTile, type: 'QUESTION' };
+    }
   }
 
   return cells;
