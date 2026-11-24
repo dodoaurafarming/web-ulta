@@ -1,0 +1,84 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+/// Statistik agregat pemain untuk Leaderboard (total main, menang, dan akurasi kuis IT).
+model PlayerStat {
+  id                Int                @id @default(autoincrement())
+  playerName        String             @unique @db.VarChar(64)
+  gamesPlayed       Int                @default(0)
+  gamesWon          Int                @default(0)
+  questionsAnswered Int                @default(0)
+  questionsCorrect  Int                @default(0)
+  lastPlayedAt      DateTime?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  participations    MatchParticipant[]
+
+  @@index([gamesWon, gamesPlayed])
+  @@map("player_stats")
+}
+
+/// Riwayat setiap pertandingan Ular Tangga yang selesai (event GAME_OVER).
+model MatchHistory {
+  id           Int                @id @default(autoincrement())
+  /// Kunci unik opsional untuk mencegah duplikasi jika beberapa client mengirim GAME_OVER dari sesi yang sama.
+  matchKey     String?            @unique @db.VarChar(120)
+  roomCode     String             @db.VarChar(12)
+  winnerName   String             @db.VarChar(64)
+  totalPlayers Int
+  startedAt    DateTime?
+  finishedAt   DateTime           @default(now())
+  createdAt    DateTime           @default(now())
+  participants MatchParticipant[]
+
+  @@index([roomCode])
+  @@index([finishedAt])
+  @@map("match_histories")
+}
+
+/// Detail tiap pemain yang berpartisipasi dalam satu pertandingan.
+model MatchParticipant {
+  id                Int          @id @default(autoincrement())
+  matchId           Int
+  playerStatId      Int?
+  playerId          String?      @db.VarChar(64)
+  playerName        String       @db.VarChar(64)
+  rank              Int
+  finalPosition     Int          @default(1)
+  isWinner          Boolean      @default(false)
+  questionsAnswered Int          @default(0)
+  questionsCorrect  Int          @default(0)
+  match             MatchHistory @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  playerStat        PlayerStat?  @relation(fields: [playerStatId], references: [id], onDelete: SetNull)
+
+  @@index([matchId])
+  @@index([playerStatId])
+  @@index([playerName])
+  @@map("match_participants")
+}
+
+/// Referensi Bank Soal IT (opsional / sinkronisasi tampilan referensi soal di luar evaluasi server TCP).
+model QuestionBank {
+  id         Int      @id @default(autoincrement())
+  code       String   @unique @db.VarChar(32)
+  category   String   @default("Jaringan & IT") @db.VarChar(64)
+  difficulty String   @default("MEDIUM") @db.VarChar(16)
+  prompt     String   @db.Text
+  optionA    String   @db.VarChar(255)
+  optionB    String   @db.VarChar(255)
+  optionC    String   @db.VarChar(255)
+  optionD    String   @db.VarChar(255)
+  answerKey  String?  @db.VarChar(1)
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([category, isActive])
+  @@map("question_bank")
+}
