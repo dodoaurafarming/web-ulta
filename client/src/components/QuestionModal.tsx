@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ArrowRight,
   Brain,
@@ -8,6 +8,7 @@ import {
   Loader2,
   XCircle,
 } from 'lucide-react';
+import { audioManager } from '../services/audioManager';
 import type {
   ActiveQuestionState,
   ResolvedAnswerState,
@@ -48,23 +49,34 @@ export function QuestionModal({
 }: QuestionModalProps) {
   const [remainingSec, setRemainingSec] = useState<number>(20);
   const [selectedChoice, setSelectedChoice] = useState<QuizChoice | null>(null);
+  const lastTickSecRef = useRef<number | null>(null);
 
   useEffect(() => {
-    if (!question) {
+    if (!question || answerResult) {
       setSelectedChoice(null);
+      lastTickSecRef.current = null;
       return;
     }
 
     setSelectedChoice(null);
+    lastTickSecRef.current = null;
     const tick = () => {
       const elapsed = (Date.now() - question.startedAt) / 1000;
-      setRemainingSec(Math.max(0, question.deadline - elapsed));
+      const left = Math.max(0, question.deadline - elapsed);
+      setRemainingSec(left);
+
+      // Bunyi detak halus pada 5 detik terakhir countdown soal
+      const ceilSec = Math.ceil(left);
+      if (ceilSec >= 1 && ceilSec <= 5 && lastTickSecRef.current !== ceilSec) {
+        lastTickSecRef.current = ceilSec;
+        audioManager.playQuizTick(ceilSec);
+      }
     };
 
     tick();
     const interval = setInterval(tick, 100);
     return () => clearInterval(interval);
-  }, [question]);
+  }, [question, answerResult]);
 
   // Tampilkan modal jika ada soal aktif ATAU hasil jawaban yang sedang dipresentasikan
   if (!question && !answerResult) return null;
@@ -164,7 +176,10 @@ export function QuestionModal({
 
             <button
               type="button"
-              onClick={onContinueResult}
+              onClick={() => {
+                audioManager.playUiClick();
+                onContinueResult();
+              }}
               className="btn-tactile inline-flex w-full items-center justify-center gap-2 rounded-xl border-[1.5px] border-[#1F1A15] bg-[#1F1A15] px-5 py-2.5 text-sm font-bold text-[#FFFDF8] shadow-[0_3px_0_0_#4A3E33] hover:bg-[#332A22] cursor-pointer"
             >
               <span>Lanjut</span>
@@ -193,6 +208,7 @@ export function QuestionModal({
 
   const handleSelect = (choice: QuizChoice) => {
     if (!isAnswering || selectedChoice !== null) return;
+    audioManager.playUiClick();
     setSelectedChoice(choice);
     onSubmitAnswer(question.qId, choice);
   };
@@ -223,6 +239,9 @@ export function QuestionModal({
                 </h2>
                 <p className="text-xs font-semibold text-[#7A4F08]">
                   {question.category ?? 'Petak Soal ULTA/1.0'}
+                  {question.bonusDice !== undefined
+                    ? ` • Taruhan dadu bonus ±${question.bonusDice} petak`
+                    : ''}
                 </p>
               </div>
             </div>

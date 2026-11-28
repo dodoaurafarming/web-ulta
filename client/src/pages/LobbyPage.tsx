@@ -19,6 +19,7 @@ interface LobbyPageProps {
   myPlayer: RoomPlayer | null;
   isHost: boolean;
   canStartGame: boolean;
+  mockMode: boolean;
   onToggleReady: () => void;
   onStartGame: () => void;
   onLeaveRoom: () => void;
@@ -30,6 +31,7 @@ export function LobbyPage({
   myPlayer,
   isHost,
   canStartGame,
+  mockMode,
   onToggleReady,
   onStartGame,
   onLeaveRoom,
@@ -70,8 +72,11 @@ export function LobbyPage({
               Ruang tunggu room
             </h1>
             <p className="mt-1 text-sm text-[#D4C7B4]">
-              Bagikan kode room 6 karakter ini ke teman ({room.players.length}/
-              {room.maxPlayers} pemain bergabung).
+              Bagikan kode room 6 karakter ini ke teman (
+              {room.maxPlayers
+                ? `${room.players.length}/${room.maxPlayers} pemain bergabung`
+                : `${room.players.length} pemain bergabung`}
+              ).
             </p>
           </div>
 
@@ -193,16 +198,17 @@ export function LobbyPage({
               );
             })}
 
-            {Array.from({
-              length: Math.max(0, room.maxPlayers - room.players.length),
-            }).map((_, idx) => (
-              <div
-                key={`slot-${idx}`}
-                className="px-4 py-3 text-xs font-medium text-[#8E8274]"
-              >
-                Kursi kosong — menunggu pemain bergabung...
-              </div>
-            ))}
+            {room.maxPlayers !== null &&
+              Array.from({
+                length: Math.max(0, room.maxPlayers - room.players.length),
+              }).map((_, idx) => (
+                <div
+                  key={`slot-${idx}`}
+                  className="px-4 py-3 text-xs font-medium text-[#8E8274]"
+                >
+                  Kursi kosong — menunggu pemain bergabung...
+                </div>
+              ))}
           </div>
 
           {/* Bagian Bawah: Aksi Lobby */}
@@ -222,14 +228,23 @@ export function LobbyPage({
               <button
                 type="button"
                 onClick={onToggleReady}
-                className={`btn-tactile inline-flex items-center gap-1.5 rounded-xl border-2 px-5 py-2.5 text-sm font-bold text-[#FFFDF8] cursor-pointer ${
+                disabled={!mockMode && Boolean(myPlayer?.ready)}
+                className={`btn-tactile inline-flex items-center gap-1.5 rounded-xl border-2 px-5 py-2.5 text-sm font-bold text-[#FFFDF8] cursor-pointer disabled:cursor-default disabled:opacity-80 ${
                   myPlayer?.ready
-                    ? 'border-[#8A580F] bg-[#C0831F] shadow-[0_3px_0_0_#8A580F] hover:bg-[#AD7418]'
+                    ? mockMode
+                      ? 'border-[#8A580F] bg-[#C0831F] shadow-[0_3px_0_0_#8A580F] hover:bg-[#AD7418]'
+                      : 'border-[#1B4F36] bg-[#266D4B]/85 shadow-none'
                     : 'border-[#1B4F36] bg-[#266D4B] shadow-[0_3px_0_0_#1B4F36] hover:bg-[#1F5C3F]'
                 }`}
               >
                 <CheckCircle2 className="h-4 w-4" />
-                <span>{myPlayer?.ready ? 'Batal Siap' : 'Saya Siap'}</span>
+                <span>
+                  {myPlayer?.ready
+                    ? mockMode
+                      ? 'Batal Siap'
+                      : 'Sudah Siap'
+                    : 'Saya Siap'}
+                </span>
               </button>
 
               {isHost && (

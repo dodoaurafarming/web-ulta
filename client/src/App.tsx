@@ -9,6 +9,7 @@ import { GameOverPage } from './pages/GameOverPage';
 import { LandingPage } from './pages/LandingPage';
 import { LeaderboardPlaceholder } from './pages/LeaderboardPlaceholder';
 import { LobbyPage } from './pages/LobbyPage';
+import { audioManager } from './services/audioManager';
 
 type PendingRoomAction =
   | { type: 'create'; maxPlayers: number }
@@ -57,6 +58,7 @@ export default function App() {
 
   const handleCreateRoomFromLanding = useCallback(
     (playerName: string, maxPlayers: number) => {
+      audioManager.playUiClick();
       setActiveView('game');
       if (
         game.connectionStatus === 'connected' &&
@@ -74,6 +76,7 @@ export default function App() {
 
   const handleJoinRoomFromLanding = useCallback(
     (playerName: string, roomCode: string) => {
+      audioManager.playUiClick();
       setActiveView('game');
       if (
         game.connectionStatus === 'connected' &&
@@ -90,8 +93,29 @@ export default function App() {
   );
 
   const handleReturnHome = useCallback(() => {
+    audioManager.playUiClick();
     game.leaveRoom();
     setActiveView('game');
+  }, [game]);
+
+  const handleToggleReady = useCallback(() => {
+    audioManager.playUiClick();
+    game.toggleReady();
+  }, [game]);
+
+  const handleStartGame = useCallback(() => {
+    audioManager.playUiClick();
+    game.startGame();
+  }, [game]);
+
+  const handleRollDice = useCallback(() => {
+    audioManager.playUiClick();
+    game.rollDice();
+  }, [game]);
+
+  const handleLeaveRoom = useCallback(() => {
+    audioManager.playUiClick();
+    game.leaveRoom();
   }, [game]);
 
   // Tetap di Arena sampai animasi langkah kemenangan selesai diputar oleh Presentation Queue
@@ -104,6 +128,16 @@ export default function App() {
   const isArenaViewport =
     activeView === 'game' &&
     (game.phase === 'playing' || (game.phase === 'gameover' && !showGameOver));
+
+  // Putar BGM hangat secara otomatis di Lobby & Arena, hentikan di Landing/Game Over
+  useEffect(() => {
+    const shouldPlayBgm =
+      activeView === 'game' && (game.phase === 'lobby' || isArenaViewport);
+    audioManager.setBgmActive(shouldPlayBgm);
+    return () => {
+      audioManager.setBgmActive(false);
+    };
+  }, [activeView, game.phase, isArenaViewport]);
 
   const canRoll = Boolean(
     game.phase === 'playing' &&
@@ -131,7 +165,7 @@ export default function App() {
         onToggleMockMode={game.setMockMode}
         onReconnect={game.reconnect}
         onChangeView={setActiveView}
-        onLeaveRoom={isArenaViewport ? game.leaveRoom : undefined}
+        onLeaveRoom={isArenaViewport ? handleLeaveRoom : undefined}
         onToggleMobileDrawer={
           isArenaViewport
             ? () => setMobileDrawerOpen((prev) => !prev)
@@ -158,9 +192,10 @@ export default function App() {
             myPlayer={game.myPlayer}
             isHost={game.isHost}
             canStartGame={game.canStartGame}
-            onToggleReady={game.toggleReady}
-            onStartGame={game.startGame}
-            onLeaveRoom={game.leaveRoom}
+            mockMode={game.mockMode}
+            onToggleReady={handleToggleReady}
+            onStartGame={handleStartGame}
+            onLeaveRoom={handleLeaveRoom}
           />
         ) : isArenaViewport ? (
           <GameArenaPage
@@ -184,7 +219,7 @@ export default function App() {
             logs={game.logs}
             mobileDrawerOpen={mobileDrawerOpen}
             onCloseMobileDrawer={() => setMobileDrawerOpen(false)}
-            onRollDice={game.rollDice}
+            onRollDice={handleRollDice}
           />
         ) : showGameOver && presentation.presentedGameOver ? (
           <GameOverPage

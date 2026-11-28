@@ -8,6 +8,8 @@ export type GamePhase = 'landing' | 'lobby' | 'playing' | 'gameover';
 
 export type TileEffect = 'NORMAL' | 'SNAKE' | 'LADDER' | 'QUESTION';
 
+export type JumpKind = 'SNAKE' | 'LADDER';
+
 export type QuizChoice = 'A' | 'B' | 'C' | 'D';
 
 export type PlayerConnectionState = 'online' | 'offline' | 'left';
@@ -66,6 +68,12 @@ export interface BoardCell {
   to?: number;
 }
 
+export interface JumpEffect {
+  from: number;
+  kind: JumpKind;
+  to: number;
+}
+
 export interface RoomPlayer {
   playerId: string;
   name: string;
@@ -80,8 +88,10 @@ export interface RoomPlayer {
 export interface RoomStateData {
   roomCode: string;
   hostId: string | null;
-  maxPlayers: number;
+  /** Opsional: game.py tidak mengirim max_players di ROOM_STATE */
+  maxPlayers: number | null;
   status: string;
+  phase?: string;
   players: RoomPlayer[];
 }
 
@@ -114,6 +124,7 @@ export interface GameStartEvent {
   type: 'GAME_START';
   seq?: number;
   roomCode?: string;
+  seed?: number;
   board: BoardCell[];
   turnOrder: string[];
   players?: RoomPlayer[];
@@ -123,6 +134,7 @@ export interface TurnEvent {
   type: 'TURN';
   seq?: number;
   playerId: string;
+  turnNo?: number;
   deadline: number;
 }
 
@@ -133,7 +145,10 @@ export interface MoveEvent {
   dice: number;
   from: number;
   path: number[];
+  /** Ringkasan efek utama (turunan dari effects[0] atau field singular `effect`) */
   effect: TileEffect;
+  /** Daftar rantai lompatan ular/tangga dari server Python (`effects`) */
+  effects: JumpEffect[];
   to: number;
 }
 
@@ -142,8 +157,10 @@ export interface QuestionEvent {
   seq?: number;
   qId: string;
   playerId: string;
+  turnNo?: number;
   prompt: string;
   options: Record<QuizChoice, string>;
+  bonusDice?: number;
   deadline: number;
   category?: string;
 }
@@ -151,14 +168,17 @@ export interface QuestionEvent {
 export interface AnswerResultEvent {
   type: 'ANSWER_RESULT';
   seq?: number;
-  playerId: string;
+  /** Opsional: server Python (`game.py`) tidak mengirim player_id di ANSWER_RESULT */
+  playerId?: string;
   bonusDice: number;
   to: number;
   from?: number;
+  path?: number[];
+  effects: JumpEffect[];
   qId?: string;
   /**
    * Opsional: hanya dikirim server kepada pemain yang menjawab.
-   * Pemain lain tidak menerima field ini dan menyimpulkan dari perubahan posisi.
+   * Pemain lain tidak menerima field ini dan menyimpulkan dari perubahan posisi/path.
    */
   correct?: boolean;
 }
@@ -174,7 +194,7 @@ export interface PlayerStatusEvent {
 export interface GameOverEvent {
   type: 'GAME_OVER';
   seq?: number;
-  winnerId?: string;
+  winnerId?: string | null;
   winnerName: string;
   ranking: RankingEntry[];
 }

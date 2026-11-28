@@ -153,9 +153,9 @@ export function useGameSocket(hookOptions: UseGameSocketOptions = {}) {
     const store = useGameStore.getState();
     const stored = loadStoredSession();
     const name = store.playerName || stored?.playerName || 'Pemain';
-    const hasToken = Boolean(store.token || stored?.token);
 
-    connect(name, { useReconnect: hasToken });
+    // server.py mewajibkan HELLO segera saat koneksi TCP/WS baru dibuka
+    connect(name, { useReconnect: false });
   }, [connect]);
 
   const disconnect = useCallback(() => {
@@ -197,6 +197,7 @@ export function useGameSocket(hookOptions: UseGameSocketOptions = {}) {
   const createRoom = useCallback(
     (maxPlayers: number) => {
       const clamped = Math.max(2, Math.min(5, Math.round(maxPlayers)));
+      useGameStore.getState().setRequestedMaxPlayers(clamped);
       return sendMessage({ type: 'CREATE_ROOM', max_players: clamped });
     },
     [sendMessage],
@@ -205,6 +206,7 @@ export function useGameSocket(hookOptions: UseGameSocketOptions = {}) {
   const joinRoom = useCallback(
     (roomCode: string) => {
       const normalized = roomCode.trim().toUpperCase();
+      useGameStore.getState().setRequestedMaxPlayers(null);
       return sendMessage({ type: 'JOIN_ROOM', room_code: normalized });
     },
     [sendMessage],

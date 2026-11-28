@@ -116,7 +116,7 @@ const MOCK_QUESTIONS: MockQuestionRecord[] = [
   },
   {
     id: 'q_10',
-    category: 'Arsitektur Web',
+    category: 'Protokol Web',
     prompt: 'Metode HTTP yang bersifat idempoten untuk membaca data tanpa mengubah state server adalah...',
     options: { A: 'POST', B: 'GET', C: 'PATCH', D: 'CONNECT' },
     answer: 'B',
@@ -130,12 +130,162 @@ const MOCK_QUESTIONS: MockQuestionRecord[] = [
   },
   {
     id: 'q_12',
-    category: 'Pemrograman Web',
+    category: 'Protokol Web',
     prompt: 'Format pertukaran data teks ringan berbasis key-value yang dipakai pada ULTA/1.0 adalah...',
     options: { A: 'XML', B: 'JSON', C: 'CSV', D: 'INI' },
     answer: 'B',
   },
+  {
+    id: 'q_13',
+    category: 'TCP/IP',
+    prompt: 'Urutan proses Three-Way Handshake saat membangun koneksi TCP adalah...',
+    options: {
+      A: 'SYN → ACK → FIN',
+      B: 'SYN → SYN-ACK → ACK',
+      C: 'ACK → SYN → RST',
+      D: 'HELLO → WELCOME → PING',
+    },
+    answer: 'B',
+  },
+  {
+    id: 'q_14',
+    category: 'TCP/IP',
+    prompt: 'Berapa jumlah alamat host yang dapat digunakan pada subnet IPv4 dengan prefix /24?',
+    options: { A: '126', B: '254', C: '256', D: '510' },
+    answer: 'B',
+  },
+  {
+    id: 'q_15',
+    category: 'Jaringan Komputer',
+    prompt: 'Protokol yang digunakan perintah ping untuk menguji keterjangkauan host adalah...',
+    options: { A: 'ICMP', B: 'SNMP', C: 'BGP', D: 'FTP' },
+    answer: 'A',
+  },
+  {
+    id: 'q_16',
+    category: 'Jaringan Komputer',
+    prompt: 'Perangkat jaringan yang bekerja di Layer 2 OSI dan meneruskan frame berdasarkan MAC address adalah...',
+    options: { A: 'Repeater', B: 'Switch', C: 'Modem', D: 'Firewall' },
+    answer: 'B',
+  },
+  {
+    id: 'q_17',
+    category: 'Protokol Web',
+    prompt: 'Kode status HTTP 429 menunjukkan kondisi apa pada server?',
+    options: {
+      A: 'Payload terlalu besar',
+      B: 'Terlalu banyak permintaan (Too Many Requests)',
+      C: 'Gateway timeout',
+      D: 'Resource tidak ditemukan',
+    },
+    answer: 'B',
+  },
+  {
+    id: 'q_18',
+    category: 'Protokol Web',
+    prompt: 'Header HTTP yang digunakan browser untuk memverifikasi izin akses lintas origin adalah...',
+    options: {
+      A: 'Content-Encoding',
+      B: 'Access-Control-Allow-Origin',
+      C: 'Cache-Control',
+      D: 'Accept-Language',
+    },
+    answer: 'B',
+  },
+  {
+    id: 'q_19',
+    category: 'Basis Data',
+    prompt: 'Kunci kolom yang menjamin keunikan setiap baris dalam satu tabel relasional disebut...',
+    options: { A: 'Foreign Key', B: 'Primary Key', C: 'Index Key', D: 'View Key' },
+    answer: 'B',
+  },
+  {
+    id: 'q_20',
+    category: 'Basis Data',
+    prompt: 'Sifat transaksi database yang memastikan seluruh operasi berhasil bersama atau dibatalkan bersama adalah...',
+    options: { A: 'Atomicity', B: 'Sharding', C: 'Replication', D: 'Indexing' },
+    answer: 'A',
+  },
+  {
+    id: 'q_21',
+    category: 'Basis Data',
+    prompt: 'Klausa SQL untuk menyaring hasil agregasi setelah GROUP BY adalah...',
+    options: { A: 'WHERE', B: 'ORDER BY', C: 'HAVING', D: 'LIMIT' },
+    answer: 'C',
+  },
+  {
+    id: 'q_22',
+    category: 'Basis Data',
+    prompt: 'Port default untuk layanan database MySQL adalah...',
+    options: { A: '5432', B: '3306', C: '6379', D: '27017' },
+    answer: 'B',
+  },
+  {
+    id: 'q_23',
+    category: 'Sistem Operasi',
+    prompt: 'Kondisi ketika dua proses saling menunggu resource yang sedang dipegang satu sama lain disebut...',
+    options: { A: 'Paging', B: 'Deadlock', C: 'Thrashing', D: 'Interrupt' },
+    answer: 'B',
+  },
+  {
+    id: 'q_24',
+    category: 'Sistem Operasi',
+    prompt: 'Algoritma penjadwalan CPU yang memberi jatah waktu (time quantum) bergiliran ke tiap proses adalah...',
+    options: { A: 'FIFO', B: 'Round Robin', C: 'SJF', D: 'LIFO' },
+    answer: 'B',
+  },
+  {
+    id: 'q_25',
+    category: 'Sistem Operasi',
+    prompt: 'Unit eksekusi terkecil di dalam sebuah proses yang berbagi ruang memori yang sama disebut...',
+    options: { A: 'Kernel', B: 'Thread', C: 'Daemon', D: 'Register' },
+    answer: 'B',
+  },
+  {
+    id: 'q_26',
+    category: 'Algoritma & Struktur Data',
+    prompt: 'Kompleksitas waktu rata-rata pencarian elemen menggunakan Binary Search pada array terurut adalah...',
+    options: { A: 'O(1)', B: 'O(log n)', C: 'O(n)', D: 'O(n log n)' },
+    answer: 'B',
+  },
+  {
+    id: 'q_27',
+    category: 'Algoritma & Struktur Data',
+    prompt: 'Struktur data dengan prinsip First-In First-Out (FIFO) yang dipakai pada antrean event adalah...',
+    options: { A: 'Stack', B: 'Queue', C: 'Binary Tree', D: 'Heap' },
+    answer: 'B',
+  },
+  {
+    id: 'q_28',
+    category: 'Algoritma & Struktur Data',
+    prompt: 'Struktur data yang paling efisien (rata-rata O(1)) untuk pencarian pasangan key-value adalah...',
+    options: { A: 'Linked List', B: 'Hash Table', C: 'Stack', D: 'Graph' },
+    answer: 'B',
+  },
+  {
+    id: 'q_29',
+    category: 'Keamanan Jaringan',
+    prompt: 'Fungsi kriptografi satu arah seperti SHA-256 yang menghasilkan sidik jari data berukuran tetap disebut...',
+    options: { A: 'Hashing', B: 'Encoding', C: 'Compression', D: 'Tunneling' },
+    answer: 'A',
+  },
+  {
+    id: 'q_30',
+    category: 'Pemrograman Jaringan',
+    prompt: 'Tujuan utama pengiriman pesan PING/PONG secara berkala (heartbeat) pada koneksi real-time adalah...',
+    options: {
+      A: 'Mengenkripsi payload JSON',
+      B: 'Menjaga koneksi tetap aktif dan mendeteksi putusnya client',
+      C: 'Mengacak papan permainan',
+      D: 'Menghitung skor leaderboard',
+    },
+    answer: 'B',
+  },
 ];
+
+export function getMockQuestionBankSize(): number {
+  return MOCK_QUESTIONS.length;
+}
 
 const BOT_NAMES = ['Bot-Raka', 'Bot-Nadia', 'Bot-Dimas', 'Bot-Sinta'];
 
@@ -272,15 +422,19 @@ const FALLBACK_SNAKES: Array<[number, number]> = [
   [93, 73],
 ];
 
-const FALLBACK_QUESTIONS: number[] = [7, 25, 45, 65, 78, 98];
+const FALLBACK_QUESTIONS: number[] = [
+  5, 9, 13, 19, 25, 39, 43, 47, 55, 59, 64, 68, 76, 86, 98,
+];
 
 /**
- * Generator papan Mock Mode yang lega dan terdistribusi rapi:
- * - 5 Tangga (LADDER), 5 Ular (SNAKE), 6 Petak Soal (QUESTION), 84 Normal (petak 1 & 100 selalu NORMAL).
+ * Generator papan Mock Mode yang lega dan terdistribusi merata:
+ * - 5 Tangga (LADDER), 5 Ular (SNAKE), 15 Petak Soal (QUESTION), 75 Normal (petak 1 & 100 selalu NORMAL).
  * - Tersebar merata di zona bawah, tengah, dan atas.
- * - Jarak grid minimal 2 petak (Chebyshev >= 2) antar seluruh kepala/ekor/ujung.
+ * - Jarak grid minimal 2 petak (Chebyshev >= 2) antar seluruh kepala/ekor/ujung ular/tangga.
  * - Panjang lompatan wajar (1–3 baris, maksimal 1 jalur panjang 4 baris).
  * - Filter anti-crossing agar garis ular/tangga tidak saling bersilangan.
+ * - 15 petak soal tersebar merata (1–2 petak soal di setiap rentang 10 petak),
+ *   tidak bersebelahan berturut-turut, dan tidak bertabrakan dengan ujung ular/tangga.
  */
 export function generateMockBoard(rng: () => number = Math.random): BoardCell[] {
   const allPoints: GridPoint[] = Array.from({ length: 100 }, (_, i) =>
@@ -391,36 +545,60 @@ export function generateMockBoard(rng: () => number = Math.random): BoardCell[] 
       endpoints.push(chosen.from, chosen.to);
     }
 
-    // Tempatkan 6 petak soal (2 bawah, 2 tengah, 2 atas), tidak tumpang tindih & berjarak
-    const questionZones: Array<[number, number]> = [
+    // Tempatkan 15 petak soal merata: minimal 1 dan maksimal 2 petak di tiap rentang 10 petak (row 0..9),
+    // tidak bertabrakan dengan ujung ular/tangga, dan tidak menumpuk bersebelahan (|q1 - q2| >= 2).
+    const usedEndpointTiles = new Set(endpoints.map((ep) => ep.tile));
+    const questionTiles: number[] = [];
+    const perRowCount = new Array<number>(10).fill(0);
+
+    const canPlaceQuestion = (tile: number): boolean => {
+      if (tile === 1 || tile === 100) return false;
+      if (usedEndpointTiles.has(tile)) return false;
+      if (questionTiles.includes(tile)) return false;
+      // Hindari petak soal bersebelahan langsung secara urutan nomor
+      if (questionTiles.some((q) => Math.abs(q - tile) < 2)) return false;
+      return true;
+    };
+
+    // Pass 1: 1 petak soal wajib di setiap rentang 10 petak (row 0..9 -> 10 petak)
+    for (let row = 0; row < 10; row += 1) {
+      const bandCandidates = shuffleWithRng(
+        allPoints.filter((p) => p.row === row && canPlaceQuestion(p.tile)),
+        rng,
+      );
+      if (bandCandidates.length === 0) return null;
+      questionTiles.push(bandCandidates[0].tile);
+      perRowCount[row] += 1;
+    }
+
+    // Pass 2: 5 petak soal tambahan tersebar seimbang di zona bawah (0..2), tengah (3..6), atas (7..9)
+    const extraZoneBands: Array<[number, number]> = [
       [0, 2],
       [0, 2],
       [3, 6],
       [3, 6],
-      [7, 9],
       [7, 9],
     ];
-    const usedEndpointTiles = new Set(endpoints.map((ep) => ep.tile));
-    const questionPoints: GridPoint[] = [];
 
-    for (const [minRow, maxRow] of questionZones) {
+    for (const [minRow, maxRow] of extraZoneBands) {
       const candidates = shuffleWithRng(
         allPoints.filter(
           (p) =>
             p.row >= minRow &&
             p.row <= maxRow &&
-            !usedEndpointTiles.has(p.tile) &&
-            questionPoints.every((qp) => chebyshevDistance(p, qp) >= 2),
+            perRowCount[p.row] < 2 &&
+            canPlaceQuestion(p.tile),
         ),
         rng,
       );
       if (candidates.length === 0) return null;
-      questionPoints.push(candidates[0]);
+      questionTiles.push(candidates[0].tile);
+      perRowCount[candidates[0].row] += 1;
     }
 
     return {
       paths: placed,
-      questions: questionPoints.map((q) => q.tile),
+      questions: questionTiles,
     };
   };
 
@@ -491,7 +669,8 @@ export class MockGameTransport implements GameTransport {
   private pendingQuestion: PendingMockQuestion | null = null;
   private turnDeadlineTimer: ReturnType<typeof setTimeout> | null = null;
   private questionDeadlineTimer: ReturnType<typeof setTimeout> | null = null;
-  private questionCursor = 0;
+  private questionDeck: MockQuestionRecord[] = [];
+  private lastQuestionId: string | null = null;
 
   constructor(config: MockTransportTimingConfig = {}) {
     this.timing = {
@@ -922,9 +1101,26 @@ export class MockGameTransport implements GameTransport {
     }
   }
 
+  private drawNextQuestion(): MockQuestionRecord {
+    if (this.questionDeck.length === 0) {
+      const fresh = shuffleWithRng(MOCK_QUESTIONS, this.rng);
+      // Cegah soal yang sama muncul berturut-turut tepat setelah deck diacak ulang
+      if (
+        fresh.length > 1 &&
+        this.lastQuestionId !== null &&
+        fresh[0].id === this.lastQuestionId
+      ) {
+        [fresh[0], fresh[fresh.length - 1]] = [fresh[fresh.length - 1], fresh[0]];
+      }
+      this.questionDeck = fresh;
+    }
+    const next = this.questionDeck.shift()!;
+    this.lastQuestionId = next.id;
+    return next;
+  }
+
   private triggerQuestion(player: MockPlayerState, hadDiceSix: boolean): void {
-    const q = MOCK_QUESTIONS[this.questionCursor % MOCK_QUESTIONS.length];
-    this.questionCursor += 1;
+    const q = this.drawNextQuestion();
 
     this.pendingQuestion = {
       qId: q.id,

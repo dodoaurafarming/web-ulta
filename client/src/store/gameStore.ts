@@ -24,6 +24,7 @@ import type {
 
 export interface ActiveTurnState {
   playerId: string;
+  turnNo?: number;
   deadline: number;
   startedAt: number;
 }
@@ -33,6 +34,7 @@ export interface ActiveQuestionState extends QuestionEvent {
 }
 
 export interface ResolvedAnswerState extends AnswerResultEvent {
+  playerId: string;
   from: number;
   inferredCorrect: boolean;
 }
@@ -54,6 +56,7 @@ export interface GameStoreState {
   playerName: string;
   playerId: string | null;
   token: string | null;
+  requestedMaxPlayers: number | null;
   lastPongAt: number | null;
   lastError: ErrorEvent | null;
 
@@ -84,6 +87,7 @@ export interface GameStoreActions {
   setMockMode: (enabled: boolean) => void;
   setWsUrl: (url: string) => void;
   setPlayerName: (name: string) => void;
+  setRequestedMaxPlayers: (maxPlayers: number | null) => void;
   applyServerEvent: (event: ServerEvent) => void;
   pushToast: (input: {
     severity: ToastSeverity;
@@ -106,6 +110,7 @@ const MAX_PRESENTATION_EVENTS = 80;
 
 let uidCounter = 0;
 let presentationSeq = 0;
+
 function nextUid(prefix: string): string {
   uidCounter += 1;
   return `${prefix}_${Date.now()}_${uidCounter}`;
@@ -131,7 +136,7 @@ function getDefaultWsUrl(): string {
   } catch {
     // Fallback untuk lingkungan non-Vite (unit test Node)
   }
-  return 'ws://localhost:8080';
+  return 'ws://127.0.0.1:8765';
 }
 
 function getDefaultMockMode(): boolean {
@@ -188,6 +193,31 @@ function resolvePlayerDisplayName(
   return fallback ?? playerId;
 }
 
+/**
+ * Menyimpulkan apakah jawaban penonton benar atau salah saat `correct` sengaja
+ * tidak dikirim server: cek arah langkah awal pada `path` (tetap akurat meski
+ * langkah bonus berlanjut memicu ular/tangga atau memantul di petak 100).
+ */
+function inferAnswerCorrectness(
+  event: AnswerResultEvent,
+  previousPos: number,
+): boolean {
+  if (event.correct !== undefined) {
+    return event.correct;
+  }
+  if (event.path && event.path.length > 0) {
+    const firstStep = event.path[0];
+    if (firstStep > previousPos) return true;
+    if (firstStep < previousPos) {
+      // Satu-satunya kasus benar yang langkah awalnya turun: mulai tepat di 100
+      return previousPos === 100;
+    }
+    // Jika previousPos === 1 dan mundur mentok di 1 -> salah
+    return false;
+  }
+  return event.to > previousPos || (previousPos === 100 && event.to === 100);
+}
+
 export function createInitialGameState(): GameStoreState {
   const stored = loadStoredSession();
 
@@ -198,6 +228,7 @@ export function createInitialGameState(): GameStoreState {
     playerName: stored?.playerName ?? '',
     playerId: stored?.playerId ?? null,
     token: stored?.token ?? null,
+    requestedMaxPlayers: null,
     lastPongAt: null,
     lastError: null,
 
@@ -256,7 +287,10 @@ export function reduceServerEvent(
 
       const nextPositions: Record<string, number> = { ...state.positions };
       for (const player of event.players) {
-        if (nextPositions[player.playerId] === undefined || state.phase !== 'playing') {
+        if (
+          nextPositions[player.playerId] === undefined ||
+          state.phase !== 'playing'
+        ) {
           nextPositions[player.playerId] = player.position;
         }
       }
@@ -268,21 +302,34 @@ export function reduceServerEvent(
             ? 'gameover'
             : 'lobby';
 
-      const roomChanged = state.room?.roomCode !== event.roomCode;
-      const logs = roomChanged && event.roomCode
-        ? appendLogBounded(
-            state.logs,
-            'room',
-            `Masuk ke room ${event.roomCode} (${event.players.length}/${event.maxPlayers} pemain).`,
-          )
-        : state.logs;
+      const sameRoom = state.room?.roomCode === event.roomCode;
+      const resolvedMaxPlayers =
+        event.maxPlayers ??
+        (sameRoom ? state.room?.maxPlayers : null) ??
+        state.requestedMaxPlayers ??
+        null;
+
+      const roomChanged = !sameRoom;
+      const capacityLabel = resolvedMaxPlayers
+        ? `${event.players.length}/${resolvedMaxPlayers} pemain`
+        : `${event.players.length} pemain`;
+
+      const logs =
+        roomChanged && event.roomCode
+          ? appendLogBounded(
+              state.logs,
+              'room',
+              `Masuk ke room ${event.roomCode} (${capacityLabel}).`,
+            )
+          : state.logs;
 
       return {
         room: {
           roomCode: event.roomCode,
           hostId: event.hostId,
-          maxPlayers: event.maxPlayers,
+          maxPlayers: resolvedMaxPlayers,
           status: event.status,
+          ...(event.phase ? { phase: event.phase } : {}),
           players: event.players,
         },
         positions: nextPositions,
@@ -312,13 +359,16 @@ export function reduceServerEvent(
             ...state.room,
             roomCode: event.roomCode ?? state.room.roomCode,
             status: 'PLAYING',
-            players: players.map((p) => ({ ...p, position: positions[p.playerId] ?? 1 })),
+            players: players.map((p) => ({
+              ...p,
+              position: positions[p.playerId] ?? 1,
+            })),
           }
         : event.roomCode
           ? {
               roomCode: event.roomCode,
               hostId: players.find((p) => p.isHost)?.playerId ?? null,
-              maxPlayers: Math.max(2, players.length),
+              maxPlayers: players.length || null,
               status: 'PLAYING',
               players,
             }
@@ -351,6 +401,7 @@ export function reduceServerEvent(
       return {
         currentTurn: {
           playerId: event.playerId,
+          ...(event.turnNo !== undefined ? { turnNo: event.turnNo } : {}),
           deadline: event.deadline,
           startedAt: Date.now(),
         },
@@ -383,22 +434,43 @@ export function reduceServerEvent(
           }
         : null;
 
+      // Deteksi petak QUESTION dari papan jika backend Python mengirim effects: []
+      const landedCellType = state.board[event.to - 1]?.type;
+      const resolvedEffect =
+        event.effects.length > 0
+          ? event.effects[0].kind
+          : event.effect !== 'NORMAL'
+            ? event.effect
+            : landedCellType === 'QUESTION'
+              ? 'QUESTION'
+              : 'NORMAL';
+
+      const enrichedMove: MoveEvent = {
+        ...event,
+        effect: resolvedEffect,
+      };
+
       let logMsg = `${name} melempar dadu ${event.dice} (${event.from} → ${event.to}).`;
-      if (event.effect === 'LADDER') {
+      if (event.effects.length > 1) {
+        const chainDesc = event.effects
+          .map((e) => `${e.kind === 'LADDER' ? 'Tangga' : 'Ular'} ${e.from}→${e.to}`)
+          .join(', ');
+        logMsg = `${name} melempar ${event.dice} memicu beruntun: ${chainDesc}!`;
+      } else if (resolvedEffect === 'LADDER') {
         logMsg = `${name} melempar ${event.dice} dan naik tangga ke petak ${event.to}!`;
-      } else if (event.effect === 'SNAKE') {
+      } else if (resolvedEffect === 'SNAKE') {
         logMsg = `${name} melempar ${event.dice} dan digigit ular turun ke petak ${event.to}!`;
-      } else if (event.effect === 'QUESTION') {
+      } else if (resolvedEffect === 'QUESTION') {
         logMsg = `${name} melempar ${event.dice} dan mendarat di petak Soal IT (${event.to}).`;
       }
 
       return {
         positions: nextPositions,
         room: nextRoom,
-        lastMove: event,
+        lastMove: enrichedMove,
         presentationEvents: appendPresentationEvent(
           state.presentationEvents,
-          event,
+          enrichedMove,
         ),
         logs: appendLogBounded(state.logs, 'move', logMsg),
       };
@@ -424,45 +496,52 @@ export function reduceServerEvent(
     }
 
     case 'ANSWER_RESULT': {
-      const name = resolvePlayerDisplayName(state, event.playerId);
+      const resolvedPlayerId =
+        event.playerId ??
+        state.activeQuestion?.playerId ??
+        state.currentTurn?.playerId ??
+        state.playerId ??
+        'unknown';
+      const name = resolvePlayerDisplayName(state, resolvedPlayerId);
       const previousPos =
-        event.from ?? state.positions[event.playerId] ?? 1;
-
-      // Jika `correct` tidak dikirim (mode penonton), simpulkan dari perubahan posisi
-      const inferredCorrect =
-        event.correct !== undefined
-          ? event.correct
-          : event.to > previousPos || (previousPos === 100 && event.to === 100);
+        event.from ?? state.positions[resolvedPlayerId] ?? 1;
+      const inferredCorrect = inferAnswerCorrectness(event, previousPos);
 
       const nextPositions: Record<string, number> = {
         ...state.positions,
-        [event.playerId]: event.to,
+        [resolvedPlayerId]: event.to,
       };
 
       const nextRoom: RoomStateData | null = state.room
         ? {
             ...state.room,
             players: state.room.players.map((p) =>
-              p.playerId === event.playerId ? { ...p, position: event.to } : p,
+              p.playerId === resolvedPlayerId ? { ...p, position: event.to } : p,
             ),
           }
         : null;
 
-      const prevCounter = state.quizStatsByPlayer[event.playerId] ?? {
+      const prevCounter = state.quizStatsByPlayer[resolvedPlayerId] ?? {
         answered: 0,
         correct: 0,
       };
       const nextQuizStats = {
         ...state.quizStatsByPlayer,
-        [event.playerId]: {
+        [resolvedPlayerId]: {
           answered: prevCounter.answered + 1,
           correct: prevCounter.correct + (inferredCorrect ? 1 : 0),
         },
       };
 
       const outcomeText = inferredCorrect
-        ? `${name} menjawab BENAR! Maju +${event.bonusDice} ke petak ${event.to}.`
-        : `${name} menjawab SALAH/waktu habis. Mundur -${event.bonusDice} ke petak ${event.to}.`;
+        ? `${name} menjawab BENAR! Bonus +${event.bonusDice}, kini di petak ${event.to}.`
+        : `${name} menjawab SALAH/waktu habis. Penalti -${event.bonusDice}, kini di petak ${event.to}.`;
+
+      const enrichedEvent: AnswerResultEvent = {
+        ...event,
+        playerId: resolvedPlayerId,
+        from: previousPos,
+      };
 
       return {
         activeQuestion: null,
@@ -470,14 +549,15 @@ export function reduceServerEvent(
         room: nextRoom,
         quizStatsByPlayer: nextQuizStats,
         lastAnswerResult: {
-          ...event,
+          ...enrichedEvent,
+          playerId: resolvedPlayerId,
           from: previousPos,
           inferredCorrect,
         },
-        presentationEvents: appendPresentationEvent(state.presentationEvents, {
-          ...event,
-          from: previousPos,
-        }),
+        presentationEvents: appendPresentationEvent(
+          state.presentationEvents,
+          enrichedEvent,
+        ),
         logs: appendLogBounded(state.logs, 'quiz', outcomeText),
       };
     }
@@ -492,6 +572,7 @@ export function reduceServerEvent(
         return {
           phase: 'landing',
           room: null,
+          requestedMaxPlayers: null,
           board: [],
           turnOrder: [],
           positions: {},
@@ -548,20 +629,37 @@ export function reduceServerEvent(
     }
 
     case 'GAME_OVER': {
+      // Lengkapi nama pemain dari state.room.players jika backend hanya mengirim player_id
+      const enrichedRanking = event.ranking.map((entry) => ({
+        ...entry,
+        name: entry.playerId
+          ? resolvePlayerDisplayName(state, entry.playerId, entry.name)
+          : entry.name,
+      }));
+      const enrichedWinnerName = event.winnerId
+        ? resolvePlayerDisplayName(state, event.winnerId, event.winnerName)
+        : event.winnerName;
+
+      const enrichedGameOver: GameOverEvent = {
+        ...event,
+        winnerName: enrichedWinnerName,
+        ranking: enrichedRanking,
+      };
+
       return {
         phase: 'gameover',
         currentTurn: null,
         activeQuestion: null,
-        gameOver: event,
+        gameOver: enrichedGameOver,
         room: state.room ? { ...state.room, status: 'FINISHED' } : null,
         presentationEvents: appendPresentationEvent(
           state.presentationEvents,
-          event,
+          enrichedGameOver,
         ),
         logs: appendLogBounded(
           state.logs,
           'gameover',
-          `Permainan selesai! Pemenang: ${event.winnerName}.`,
+          `Permainan selesai! Pemenang: ${enrichedWinnerName}.`,
         ),
       };
     }
@@ -602,6 +700,9 @@ export const useGameStore = create<GameStore>((set) => ({
 
   setPlayerName: (name) => set({ playerName: name }),
 
+  setRequestedMaxPlayers: (maxPlayers) =>
+    set({ requestedMaxPlayers: maxPlayers }),
+
   applyServerEvent: (event) =>
     set((state) => reduceServerEvent(state, event)),
 
@@ -636,6 +737,7 @@ export const useGameStore = create<GameStore>((set) => ({
     set({
       phase: 'landing',
       room: null,
+      requestedMaxPlayers: null,
       board: [],
       turnOrder: [],
       positions: {},

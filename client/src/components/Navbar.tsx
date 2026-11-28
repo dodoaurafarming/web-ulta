@@ -10,6 +10,7 @@ import {
   WifiOff,
 } from 'lucide-react';
 import type { ConnectionStatus } from '../types/protocol';
+import { AudioControlPopover } from './AudioControlPopover';
 
 interface NavbarProps {
   connectionStatus: ConnectionStatus;
@@ -140,6 +141,9 @@ export function Navbar({
               <span>Mock</span>
             </button>
           </div>
+
+          {/* Kontrol Audio (Mute cepat + Popover BGM/SFX) */}
+          <AudioControlPopover compact={compactArena} />
 
           {/* Status Koneksi */}
           <span

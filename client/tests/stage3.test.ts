@@ -4,6 +4,7 @@ import {
   MockGameTransport,
   doGridSegmentsIntersect,
   generateMockBoard,
+  getMockQuestionBankSize,
 } from '../src/services/mockTransport';
 import { parseServerEvent } from '../src/services/protocolParser';
 import {
@@ -278,7 +279,12 @@ test('reduceServerEvent: alur penuh game state, inferensi penonton, dan toast er
   assert.equal(state.gameOver?.winnerName, 'Syarif');
 });
 
-test('generateMockBoard: 5 ular, 5 tangga, 6 soal, jarak grid >= 2, lompatan wajar, anti-crossing', () => {
+test('generateMockBoard: 5 ular, 5 tangga, 15 soal merata, jarak grid >= 2, anti-crossing, & >= 25 bank soal', () => {
+  assert.ok(
+    getMockQuestionBankSize() >= 25,
+    `Bank soal IT harus minimal 25 soal (ditemukan ${getMockQuestionBankSize()})`,
+  );
+
   const toGrid = (tile: number) => {
     const row = Math.floor((tile - 1) / 10);
     const colInRow = (tile - 1) % 10;
@@ -299,8 +305,8 @@ test('generateMockBoard: 5 ular, 5 tangga, 6 soal, jarak grid >= 2, lompatan waj
 
     assert.equal(snakes.length, 5, `Seed ${seed}: harus tepat 5 ular`);
     assert.equal(ladders.length, 5, `Seed ${seed}: harus tepat 5 tangga`);
-    assert.equal(questions.length, 6, `Seed ${seed}: harus tepat 6 soal`);
-    assert.equal(normals.length, 84, `Seed ${seed}: harus tepat 84 normal`);
+    assert.equal(questions.length, 15, `Seed ${seed}: harus tepat 15 soal`);
+    assert.equal(normals.length, 75, `Seed ${seed}: harus tepat 75 normal`);
 
     const paths = [...snakes, ...ladders].map((c) => {
       assert.ok(typeof c.to === 'number');
@@ -326,6 +332,7 @@ test('generateMockBoard: 5 ular, 5 tangga, 6 soal, jarak grid >= 2, lompatan waj
 
     // Jarak grid minimal 2 petak antar seluruh kepala/ekor/ujung
     const allEndpoints = paths.flatMap((p) => [p.from, p.to]);
+    const endpointTileSet = new Set(allEndpoints.map((ep) => ep.tile));
     for (let i = 0; i < allEndpoints.length; i += 1) {
       for (let j = i + 1; j < allEndpoints.length; j += 1) {
         const dist = Math.max(
@@ -354,6 +361,31 @@ test('generateMockBoard: 5 ular, 5 tangga, 6 soal, jarak grid >= 2, lompatan waj
           `Seed ${seed}: jalur ${paths[i].from.tile}->${paths[i].to.tile} bersilangan dengan ${paths[j].from.tile}->${paths[j].to.tile}`,
         );
       }
+    }
+
+    // Sebaran 15 petak QUESTION: 1-2 di setiap rentang 10 petak, tidak tabrak endpoint, tidak bersebelahan
+    const qTiles = questions.map((q) => q.index).sort((a, b) => a - b);
+    const qPerDecade = new Array<number>(10).fill(0);
+    for (let i = 0; i < qTiles.length; i += 1) {
+      const tile = qTiles[i];
+      assert.equal(
+        endpointTileSet.has(tile),
+        false,
+        `Seed ${seed}: petak soal ${tile} bertabrakan dengan ujung ular/tangga`,
+      );
+      if (i > 0) {
+        assert.ok(
+          tile - qTiles[i - 1] >= 2,
+          `Seed ${seed}: petak soal ${qTiles[i - 1]} dan ${tile} menumpuk bersebelahan`,
+        );
+      }
+      qPerDecade[Math.floor((tile - 1) / 10)] += 1;
+    }
+    for (let band = 0; band < 10; band += 1) {
+      assert.ok(
+        qPerDecade[band] >= 1 && qPerDecade[band] <= 2,
+        `Seed ${seed}: rentang petak ${band * 10 + 1}-${(band + 1) * 10} memiliki ${qPerDecade[band]} petak soal (harus 1-2)`,
+      );
     }
 
     // Sebaran zona bawah (0..2), tengah (3..6), atas (7..9)
@@ -457,4 +489,142 @@ test('MockGameTransport: simulasi end-to-end ULTA/1.0 hingga GAME_OVER', async (
     sawHumanQuestion || sawBotSpectatorAnswerWithoutCorrect || state.logs.length > 10,
     'Simulasi harus menghasilkan aktivitas permainan nyata',
   );
+});
+
+test('Kontrak asli server.py + game.py + board.py: 101-el board, active_player_id, effects beruntun, ANSWER_RESULT tanpa player_id, dan rankings', () => {
+  let state: GameStoreState = createInitialGameState();
+  const apply = (raw: Record<string, unknown>) => {
+    const parsed = parseServerEvent(raw);
+    assert.ok(parsed, `Event Python gagal diparse: ${JSON.stringify(raw)}`);
+    state = { ...state, ...reduceServerEvent(state, parsed) };
+    return parsed;
+  };
+
+  apply({ type: 'WELCOME', seq: 1, player_id: 'p_aaaa', token: 'tok_live' });
+  assert.equal(state.playerId, 'p_aaaa');
+
+  // ROOM_STATE asli game.py: code, state, phase, players dict dengan host: true, tanpa host_id/max_players
+  apply({
+    type: 'ROOM_STATE',
+    code: '5C0315',
+    state: 'LOBBY',
+    phase: 'IDLE',
+    players: {
+      p_aaaa: { name: 'Syarif', pos: 1, ready: true, online: true, host: true },
+      p_bbbb: { name: 'Budi', pos: 1, ready: true, online: true, host: false },
+    },
+  });
+  assert.equal(state.phase, 'lobby');
+  assert.equal(state.room?.roomCode, '5C0315');
+  assert.equal(state.room?.hostId, 'p_aaaa');
+  assert.equal(state.room?.players[0].isHost, true);
+
+  // GAME_START asli board.py: array 101 elemen dengan board[0] === null
+  const pythonBoard: Array<Record<string, unknown> | null> = [null];
+  for (let i = 1; i <= 100; i += 1) {
+    if (i === 6) pythonBoard.push({ kind: 'LADDER', to: 24 });
+    else if (i === 24) pythonBoard.push({ kind: 'SNAKE', to: 11 });
+    else if (i === 15) pythonBoard.push({ kind: 'QUESTION' });
+    else if (i === 19) pythonBoard.push({ kind: 'SNAKE', to: 5 });
+    else pythonBoard.push({ kind: 'NORMAL' });
+  }
+  assert.equal(pythonBoard.length, 101);
+
+  apply({
+    type: 'GAME_START',
+    code: '5C0315',
+    seed: 17,
+    board: pythonBoard,
+    turn_order: ['p_aaaa', 'p_bbbb'],
+  });
+  assert.equal(state.phase, 'playing');
+  assert.equal(state.board.length, 100);
+  // Verifikasi indeks 1-based TIDAK bergeser oleh board[0] = null!
+  assert.equal(state.board[0].index, 1);
+  assert.equal(state.board[0].type, 'NORMAL');
+  assert.equal(state.board[5].index, 6);
+  assert.equal(state.board[5].type, 'LADDER');
+  assert.equal(state.board[5].to, 24);
+  assert.equal(state.board[14].index, 15);
+  assert.equal(state.board[14].type, 'QUESTION');
+  assert.equal(state.board[99].index, 100);
+  assert.equal(state.board[99].type, 'NORMAL');
+
+  // TURN asli game.py: active_player_id, turn_no, deadline_in
+  apply({
+    type: 'TURN',
+    active_player_id: 'p_bbbb',
+    turn_no: 1,
+    deadline_in: 10,
+  });
+  assert.equal(state.currentTurn?.playerId, 'p_bbbb');
+  assert.equal(state.currentTurn?.turnNo, 1);
+  assert.equal(state.currentTurn?.deadline, 10);
+
+  // MOVE asli game.py: effects beruntun (LADDER 6->24 lalu SNAKE 24->11)
+  apply({
+    type: 'MOVE',
+    player_id: 'p_bbbb',
+    dice: 5,
+    from: 1,
+    path: [2, 3, 4, 5, 6],
+    effects: [
+      { from: 6, kind: 'LADDER', to: 24 },
+      { from: 24, kind: 'SNAKE', to: 11 },
+    ],
+    to: 11,
+  });
+  assert.equal(state.positions.p_bbbb, 11);
+  assert.equal(state.lastMove?.effects.length, 2);
+  assert.equal(state.lastMove?.effects[0].kind, 'LADDER');
+  assert.equal(state.lastMove?.effects[1].kind, 'SNAKE');
+
+  // QUESTION asli game.py: text, bonus_dice, deadline_in, turn_no (tanpa answer)
+  apply({
+    type: 'QUESTION',
+    player_id: 'p_bbbb',
+    turn_no: 2,
+    q_id: 'q07',
+    text: 'Port HTTPS?',
+    options: { A: '22', B: '80', C: '443', D: '3306' },
+    bonus_dice: 4,
+    deadline_in: 20,
+  });
+  assert.equal(state.activeQuestion?.qId, 'q07');
+  assert.equal(state.activeQuestion?.bonusDice, 4);
+  assert.equal(state.activeQuestion?.deadline, 20);
+
+  // ANSWER_RESULT asli game.py untuk penonton: TANPA player_id dan TANPA correct,
+  // maju 15->19 (benar!) lalu kena ular 19->5 -> inferensi tetap BENAR berdasarkan path!
+  apply({
+    type: 'ANSWER_RESULT',
+    bonus_dice: 4,
+    from: 15,
+    path: [16, 17, 18, 19],
+    effects: [{ from: 19, kind: 'SNAKE', to: 5 }],
+    to: 5,
+  });
+  assert.equal(state.lastAnswerResult?.playerId, 'p_bbbb');
+  assert.equal(state.lastAnswerResult?.correct, undefined);
+  assert.equal(state.lastAnswerResult?.inferredCorrect, true);
+  assert.equal(state.positions.p_bbbb, 5);
+  assert.equal(state.quizStatsByPlayer.p_bbbb.correct, 1);
+
+  // GAME_OVER asli game.py: winner_id & rankings (plural) dengan final_position tanpa name
+  apply({
+    type: 'GAME_OVER',
+    winner_id: 'p_aaaa',
+    rankings: [
+      { rank: 1, player_id: 'p_aaaa', final_position: 100 },
+      { rank: 2, player_id: 'p_bbbb', final_position: 5 },
+    ],
+  });
+  assert.equal(state.phase, 'gameover');
+  assert.equal(state.gameOver?.winnerId, 'p_aaaa');
+  assert.equal(state.gameOver?.winnerName, 'Syarif');
+  assert.equal(state.gameOver?.ranking.length, 2);
+  assert.equal(state.gameOver?.ranking[0].name, 'Syarif');
+  assert.equal(state.gameOver?.ranking[0].position, 100);
+  assert.equal(state.gameOver?.ranking[1].name, 'Budi');
+  assert.equal(state.gameOver?.ranking[1].position, 5);
 });
