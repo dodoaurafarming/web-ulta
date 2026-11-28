@@ -9,17 +9,51 @@ import matchesRoutes from './routes/matches.routes';
 import playersRoutes from './routes/players.routes';
 import questionsRoutes from './routes/questions.routes';
 
+function isOriginAllowed(origin: string | undefined): boolean {
+  if (!origin) return true;
+  if (env.corsOrigins.includes('*')) return true;
+
+  return env.corsOrigins.some((pattern) => {
+    if (pattern === origin) return true;
+    if (pattern.includes('*')) {
+      const escaped = pattern
+        .replace(/[.+?^${}()|[\]\\]/g, '\\$&')
+        .replace(/\\\*/g, '.*');
+      return new RegExp(`^${escaped}$`, 'i').test(origin);
+    }
+    return false;
+  });
+}
+
 export function createApp() {
   const app = express();
 
-  app.use(helmet());
+  app.use(
+    helmet({
+      crossOriginResourcePolicy: false,
+    }),
+  );
   app.use(
     cors({
-      origin: env.corsOrigins.includes('*') ? true : env.corsOrigins,
+      origin(origin, callback) {
+        if (isOriginAllowed(origin)) {
+          callback(null, true);
+          return;
+        }
+        callback(null, false);
+      },
       credentials: true,
     }),
   );
   app.use(express.json({ limit: '100kb' }));
+
+  app.get('/', (_req, res) => {
+    res.json({
+      ok: true,
+      service: 'web-ulta-api',
+      endpoints: ['/api/health', '/api/leaderboard', '/api/matches', '/api/players', '/api/questions'],
+    });
+  });
 
   app.use('/api/health', healthRoutes);
   app.use('/api/leaderboard', leaderboardRoutes);

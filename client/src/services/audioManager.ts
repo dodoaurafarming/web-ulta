@@ -14,15 +14,25 @@ export type AudioStatusSnapshot = AudioPreferences & {
   contextState: 'uninitialized' | AudioContextState;
 };
 
-// Versi v2 agar pengguna tidak tersangkut preferensi volume/mute lama
-const STORAGE_KEY = 'ulta_audio_prefs_v2';
+export interface BgmDiagnostics {
+  rms: number;
+  peak: number;
+  contextState: 'uninitialized' | AudioContextState;
+  bgmGain: number;
+  masterGain: number;
+  bgmPlaying: boolean;
+  scheduledNotes: number;
+}
+
+// Versi v3: memastikan preferensi lama tidak membuat BGM tersangkut mute/terlalu pelan
+const STORAGE_KEY = 'ulta_audio_prefs_v3';
 
 const DEFAULT_PREFS: AudioPreferences = {
   muted: false,
   bgmEnabled: true,
   sfxEnabled: true,
-  bgmVolume: 0.65,
-  sfxVolume: 0.75,
+  bgmVolume: 0.75,
+  sfxVolume: 0.78,
 };
 
 // Frekuensi nada (Hz) — tangga nada C Mayor / A Minor hangat
@@ -137,10 +147,10 @@ type Listener = () => void;
 
 /**
  * Mesin audio tabletop berbasis Web Audio API murni (0 aset eksternal):
- * - Karakter "Warm Playful Tabletop" (marimba, kalimba, woodblock, harp — tanpa square wave kasar).
- * - Lifecycle AudioContext tangguh: await ctx.resume() pada interaksi pertama lalu langsung
- *   menyalakan BGM scheduler dengan reset `nextStepTime = ctx.currentTime + 0.05`.
- * - Audio ducking halus saat Modal Kuis aktif dan auto-pause saat tab browser hidden.
+ * - Rantai BGM: oscillator -> noteGain -> bgmGain -> bgmWarmFilter -> bgmAnalyser -> masterGain -> compressor -> destination.
+ * - Menggunakan linearRampToValueAtTime yang aman (tidak pernah exponentialRamp <= 0).
+ * - BGM otomatis aktif sejak interaksi klik pertama pengguna (termasuk di Landing),
+ *   dengan audio ducking halus saat Kuis aktif dan auto-pause saat tab browser hidden.
  */
 class TabletopAudioManager {
   private prefs: AudioPreferences = loadPreferences();
@@ -152,16 +162,20 @@ class TabletopAudioManager {
   private bgmGain: GainNode | null = null;
   private sfxGain: GainNode | null = null;
   private bgmWarmFilter: BiquadFilterNode | null = null;
+  private bgmAnalyser: AnalyserNode | null = null;
+  private analyserSamples: Float32Array<ArrayBuffer> | null = null;
   private noiseBuffer: AudioBuffer | null = null;
 
   private unlocked = false;
-  private bgmWanted = false;
+  // Default aktif agar BGM langsung berputar sejak klik pertama (termasuk di Landing)
+  private bgmWanted = true;
   private ducked = false;
   private tabHidden = false;
 
   private schedulerTimer: ReturnType<typeof setInterval> | null = null;
   private nextStepTime = 0;
   private currentStep = 0;
+  private scheduledNotesCount = 0;
   private initializedBrowserHooks = false;
   private unlockHandler: (() => void) | null = null;
 
@@ -207,6 +221,34 @@ class TabletopAudioManager {
     };
   };
 
+  /**
+   * Membaca amplitudo sinyal BGM aktual dari AnalyserNode (untuk verifikasi output non-zero).
+   */
+  public getBgmDiagnostics(): BgmDiagnostics {
+    let rms = 0;
+    let peak = 0;
+    if (this.bgmAnalyser && this.analyserSamples && this.ctx?.state === 'running') {
+      this.bgmAnalyser.getFloatTimeDomainData(this.analyserSamples);
+      let sumSq = 0;
+      for (let i = 0; i < this.analyserSamples.length; i += 1) {
+        const sample = Math.abs(this.analyserSamples[i]);
+        if (sample > peak) peak = sample;
+        sumSq += sample * sample;
+      }
+      rms = Math.sqrt(sumSq / this.analyserSamples.length);
+    }
+
+    return {
+      rms: Number(rms.toFixed(5)),
+      peak: Number(peak.toFixed(5)),
+      contextState: this.ctx ? this.ctx.state : 'uninitialized',
+      bgmGain: this.bgmGain ? Number(this.bgmGain.gain.value.toFixed(3)) : 0,
+      masterGain: this.masterGain ? Number(this.masterGain.gain.value.toFixed(3)) : 0,
+      bgmPlaying: this.snapshot.bgmPlaying,
+      scheduledNotes: this.scheduledNotesCount,
+    };
+  }
+
   private emitState(persist = false): void {
     if (persist) {
       persistPreferences(this.prefs);
@@ -221,11 +263,11 @@ class TabletopAudioManager {
     this.prefs = { ...this.prefs, muted };
     void this.ensureUnlocked().then(() => {
       this.syncGains(0.06);
-      this.syncBgmLoop();
+      this.syncBgmLoop(true);
       this.emitState(true);
     });
     this.syncGains(0.06);
-    this.syncBgmLoop();
+    this.syncBgmLoop(true);
     this.emitState(true);
   }
 
@@ -237,11 +279,11 @@ class TabletopAudioManager {
     this.prefs = { ...this.prefs, bgmEnabled: enabled };
     void this.ensureUnlocked().then(() => {
       this.syncGains(0.08);
-      this.syncBgmLoop();
+      this.syncBgmLoop(true);
       this.emitState(true);
     });
     this.syncGains(0.08);
-    this.syncBgmLoop();
+    this.syncBgmLoop(true);
     this.emitState(true);
   }
 
@@ -259,11 +301,11 @@ class TabletopAudioManager {
     this.prefs = { ...this.prefs, bgmVolume: clamp01(volume) };
     void this.ensureUnlocked().then(() => {
       this.syncGains(0.05);
-      this.syncBgmLoop();
+      this.syncBgmLoop(false);
       this.emitState(true);
     });
     this.syncGains(0.05);
-    this.syncBgmLoop();
+    this.syncBgmLoop(false);
     this.emitState(true);
   }
 
@@ -280,18 +322,15 @@ class TabletopAudioManager {
   public setBgmActive(active: boolean): void {
     if (this.bgmWanted === active) return;
     this.bgmWanted = active;
-    if (active) {
-      // Jika AudioContext sudah ada namun sempat suspended, coba resume
-      if (this.ctx && this.ctx.state === 'suspended' && this.unlocked && !this.tabHidden) {
-        void this.ctx
-          .resume()
-          .then(() => {
-            this.syncGains(0.08);
-            this.syncBgmLoop(true);
-            this.emitState(false);
-          })
-          .catch(() => {});
-      }
+    if (active && this.ctx && this.ctx.state === 'suspended' && this.unlocked && !this.tabHidden) {
+      void this.ctx
+        .resume()
+        .then(() => {
+          this.applyImmediateGains();
+          this.syncBgmLoop(true);
+          this.emitState(false);
+        })
+        .catch(() => {});
     }
     this.syncBgmLoop(true);
     this.emitState(false);
@@ -300,7 +339,7 @@ class TabletopAudioManager {
   public setDucked(ducked: boolean): void {
     if (this.ducked === ducked) return;
     this.ducked = ducked;
-    this.syncGains(0.25);
+    this.syncGains(0.22);
     this.emitState(false);
   }
 
@@ -317,9 +356,9 @@ class TabletopAudioManager {
     try {
       const ctx = new AudioCtx();
       const compressor = ctx.createDynamicsCompressor();
-      compressor.threshold.value = -12;
-      compressor.knee.value = 18;
-      compressor.ratio.value = 3.5;
+      compressor.threshold.value = -10;
+      compressor.knee.value = 16;
+      compressor.ratio.value = 3;
       compressor.attack.value = 0.005;
       compressor.release.value = 0.14;
 
@@ -329,11 +368,17 @@ class TabletopAudioManager {
 
       const bgmFilter = ctx.createBiquadFilter();
       bgmFilter.type = 'lowpass';
-      bgmFilter.frequency.value = 4_200;
-      bgmFilter.Q.value = 0.45;
+      bgmFilter.frequency.value = 4_600;
+      bgmFilter.Q.value = 0.4;
 
+      const bgmAnalyser = ctx.createAnalyser();
+      bgmAnalyser.fftSize = 256;
+
+      // Rantai BGM: oscillator -> noteGain -> bgmGain -> bgmFilter -> bgmAnalyser -> masterGain -> compressor -> destination
       bgmGain.connect(bgmFilter);
-      bgmFilter.connect(masterGain);
+      bgmFilter.connect(bgmAnalyser);
+      bgmAnalyser.connect(masterGain);
+
       sfxGain.connect(masterGain);
       masterGain.connect(compressor);
       compressor.connect(ctx.destination);
@@ -343,6 +388,8 @@ class TabletopAudioManager {
       this.bgmGain = bgmGain;
       this.sfxGain = sfxGain;
       this.bgmWarmFilter = bgmFilter;
+      this.bgmAnalyser = bgmAnalyser;
+      this.analyserSamples = new Float32Array(new ArrayBuffer(bgmAnalyser.fftSize * 4));
       this.noiseBuffer = this.createSoftNoiseBuffer(ctx);
 
       this.applyImmediateGains();
@@ -353,8 +400,9 @@ class TabletopAudioManager {
   }
 
   /**
-   * Membuat/melanjutkan AudioContext pada interaksi pengguna (pointerdown/keydown/click).
-   * Menunggu `await ctx.resume()` sampai benar-benar `running` lalu otomatis menyalakan BGM.
+   * Membuat/melanjutkan AudioContext pada interaksi klik/keyboard pertama pengguna.
+   * Menunggu `await ctx.resume()` sampai benar-benar `running`, mengeset gain nyata,
+   * lalu langsung menyalakan scheduler BGM dengan reset `nextStepTime`.
    */
   public async ensureUnlocked(): Promise<boolean> {
     const ctx = this.ensureContextGraph();
@@ -394,11 +442,23 @@ class TabletopAudioManager {
     if (this.initializedBrowserHooks || typeof window === 'undefined') return;
     this.initializedBrowserHooks = true;
 
+    // Expose debug helper kecil untuk verifikasi sinyal AnalyserNode di browser
+    (
+      window as unknown as {
+        __ultaAudioDebug?: {
+          getDiagnostics: () => BgmDiagnostics;
+          playBgmPreview: () => Promise<void>;
+        };
+      }
+    ).__ultaAudioDebug = {
+      getDiagnostics: () => this.getBgmDiagnostics(),
+      playBgmPreview: () => this.playBgmPreview(),
+    };
+
     this.unlockHandler = () => {
       void this.ensureUnlocked();
     };
 
-    // Dengarkan pointerdown, keydown, dan click; baru dilepas setelah AudioContext benar-benar running
     window.addEventListener('pointerdown', this.unlockHandler, { passive: true });
     window.addEventListener('keydown', this.unlockHandler, { passive: true });
     window.addEventListener('click', this.unlockHandler, { passive: true });
@@ -413,20 +473,18 @@ class TabletopAudioManager {
             void this.ctx.suspend().catch(() => {});
           }
           this.emitState(false);
+        } else if (this.ctx && this.ctx.state === 'suspended' && this.unlocked && !this.prefs.muted) {
+          void this.ctx
+            .resume()
+            .then(() => {
+              this.applyImmediateGains();
+              this.syncBgmLoop(true);
+              this.emitState(false);
+            })
+            .catch(() => {});
         } else {
-          if (this.ctx && this.ctx.state === 'suspended' && this.unlocked && !this.prefs.muted) {
-            void this.ctx
-              .resume()
-              .then(() => {
-                this.applyImmediateGains();
-                this.syncBgmLoop(true);
-                this.emitState(false);
-              })
-              .catch(() => {});
-          } else {
-            this.syncBgmLoop(true);
-            this.emitState(false);
-          }
+          this.syncBgmLoop(true);
+          this.emitState(false);
         }
       });
     }
@@ -450,12 +508,12 @@ class TabletopAudioManager {
   } {
     const master = this.prefs.muted ? 0 : 1;
     const duckFactor = this.ducked ? 0.32 : 1;
-    // Level BGM cukup hangat & jelas terdengar di speaker laptop/HP, seimbang terhadap SFX
+    // Gain BGM nyata (0.45 pada default volume 75%) agar hangat & jelas terdengar di speaker produksi
     const bgm = this.prefs.bgmEnabled
-      ? this.prefs.bgmVolume * 0.72 * duckFactor
+      ? this.prefs.bgmVolume * 0.6 * duckFactor
       : 0;
     const sfx = this.prefs.sfxEnabled ? this.prefs.sfxVolume * 0.85 : 0;
-    const cutoff = this.ducked ? 1_800 : 4_200;
+    const cutoff = this.ducked ? 1_900 : 4_600;
     return { master, bgm, sfx, cutoff };
   }
 
@@ -530,7 +588,6 @@ class TabletopAudioManager {
     if (!this.ctx) return;
 
     if (resetClock || this.schedulerTimer === null) {
-      // Reset nextStepTime agar tidak ada jadwal nada yang tertinggal di masa lalu
       this.nextStepTime = this.ctx.currentTime + 0.05;
     }
 
@@ -538,7 +595,6 @@ class TabletopAudioManager {
       this.schedulerTimer = setInterval(() => {
         this.scheduleBgmLookahead();
       }, 65);
-      // Jadwalkan ketukan awal segera tanpa menunggu tick interval pertama
       this.scheduleBgmLookahead();
     }
   }
@@ -554,12 +610,11 @@ class TabletopAudioManager {
     if (!this.ctx || !this.bgmGain || this.ctx.state !== 'running') return;
     const now = this.ctx.currentTime;
 
-    // Pengaman drift: jika waktu jadwal tertinggal (mis. CPU stutter / resume), reset ke depan
     if (this.nextStepTime < now - 0.1) {
       this.nextStepTime = now + 0.05;
     }
 
-    const lookaheadEnd = now + 0.2;
+    const lookaheadEnd = now + 0.22;
     while (this.nextStepTime < lookaheadEnd) {
       this.scheduleBgmStep(this.currentStep, this.nextStepTime);
       this.nextStepTime += EIGHTH_SEC;
@@ -579,8 +634,8 @@ class TabletopAudioManager {
         freq: chord.bass,
         type: 'sine',
         start: time,
-        duration: beatInBar === 0 ? 0.5 : 0.32,
-        gain: 0.34,
+        duration: beatInBar === 0 ? 0.52 : 0.34,
+        gain: 0.38,
         attack: 0.015,
       });
     }
@@ -592,8 +647,8 @@ class TabletopAudioManager {
           freq,
           type: 'triangle',
           start: time + idx * 0.025,
-          duration: 0.72,
-          gain: 0.125,
+          duration: 0.78,
+          gain: 0.145,
           attack: 0.016,
         });
       });
@@ -606,24 +661,53 @@ class TabletopAudioManager {
         freq: melodyFreq,
         type: 'triangle',
         start: time,
-        duration: 0.26,
-        gain: 0.27,
+        duration: 0.28,
+        gain: 0.3,
         attack: 0.008,
       });
       this.playTone(this.bgmGain, {
         freq: melodyFreq * 2,
         type: 'sine',
         start: time,
-        duration: 0.12,
-        gain: 0.055,
+        duration: 0.13,
+        gain: 0.065,
         attack: 0.006,
       });
     }
 
     // 4. Perkusi woodblock kayu ringan di off-beat
     if (beatInBar === 2 || beatInBar === 6) {
-      this.playWoodTap(this.bgmGain, time, beatInBar === 2 ? 980 : 1240, 0.075);
+      this.playWoodTap(this.bgmGain, time, beatInBar === 2 ? 980 : 1240, 0.085);
     }
+
+    this.scheduledNotesCount += 1;
+  }
+
+  /**
+   * Preview 1 bar melodi BGM langsung lewat tombol "Tes Musik" di popover audio.
+   */
+  public async playBgmPreview(): Promise<void> {
+    const ok = await this.ensureUnlocked();
+    if (!ok || !this.ctx || !this.bgmGain) return;
+
+    // Pastikan tidak dibisukan untuk preview 1 bar
+    if (this.prefs.muted) {
+      this.prefs = { ...this.prefs, muted: false };
+    }
+    if (!this.prefs.bgmEnabled) {
+      this.prefs = { ...this.prefs, bgmEnabled: true };
+    }
+    if (this.prefs.bgmVolume < 0.2) {
+      this.prefs = { ...this.prefs, bgmVolume: 0.7 };
+    }
+    this.applyImmediateGains();
+
+    const startBase = this.ctx.currentTime + 0.03;
+    for (let step = 0; step < 8; step += 1) {
+      this.scheduleBgmStep(step, startBase + step * EIGHTH_SEC);
+    }
+    this.syncBgmLoop(true);
+    this.emitState(true);
   }
 
   private canPlaySfx(): boolean {
@@ -636,6 +720,10 @@ class TabletopAudioManager {
     return true;
   }
 
+  /**
+   * Memutar 1 nada murni sine/triangle dengan amplop linear yang aman
+   * (tidak pernah memanggil exponentialRampToValueAtTime <= 0).
+   */
   private playTone(
     destination: AudioNode,
     opts: {
@@ -649,31 +737,34 @@ class TabletopAudioManager {
     },
   ): void {
     if (!this.ctx) return;
+    const safeStart = Math.max(this.ctx.currentTime, opts.start);
+    const safeFreq = Math.max(40, opts.freq);
+    const attack = Math.min(opts.attack ?? 0.01, opts.duration * 0.45);
+    const safeDuration = Math.max(attack + 0.02, opts.duration);
+    const peakGain = Math.max(0.001, opts.gain);
+
     const osc = this.ctx.createOscillator();
     const env = this.ctx.createGain();
 
     osc.type = opts.type;
-    osc.frequency.setValueAtTime(opts.freq, opts.start);
+    osc.frequency.setValueAtTime(safeFreq, safeStart);
     if (opts.endFreq !== undefined) {
-      osc.frequency.exponentialRampToValueAtTime(
+      osc.frequency.linearRampToValueAtTime(
         Math.max(40, opts.endFreq),
-        opts.start + opts.duration,
+        safeStart + safeDuration,
       );
     }
 
-    const attack = opts.attack ?? 0.01;
-    env.gain.setValueAtTime(0.0001, opts.start);
-    env.gain.linearRampToValueAtTime(opts.gain, opts.start + attack);
-    env.gain.exponentialRampToValueAtTime(
-      0.0001,
-      opts.start + Math.max(attack + 0.01, opts.duration),
-    );
+    env.gain.setValueAtTime(0, safeStart);
+    env.gain.linearRampToValueAtTime(peakGain, safeStart + attack);
+    env.gain.linearRampToValueAtTime(peakGain * 0.35, safeStart + safeDuration * 0.65);
+    env.gain.linearRampToValueAtTime(0, safeStart + safeDuration);
 
     osc.connect(env);
     env.connect(destination);
 
-    osc.start(opts.start);
-    osc.stop(opts.start + opts.duration + 0.02);
+    osc.start(safeStart);
+    osc.stop(safeStart + safeDuration + 0.025);
   }
 
   private playWoodTap(
@@ -683,12 +774,14 @@ class TabletopAudioManager {
     gain: number,
   ): void {
     if (!this.ctx) return;
+    const safeTime = Math.max(this.ctx.currentTime, time);
+
     this.playTone(destination, {
       freq,
       endFreq: freq * 0.62,
       type: 'sine',
-      start: time,
-      duration: 0.042,
+      start: safeTime,
+      duration: 0.045,
       gain,
       attack: 0.003,
     });
@@ -702,14 +795,14 @@ class TabletopAudioManager {
       filter.Q.value = 3.5;
 
       const env = this.ctx.createGain();
-      env.gain.setValueAtTime(gain * 0.45, time);
-      env.gain.exponentialRampToValueAtTime(0.0001, time + 0.03);
+      env.gain.setValueAtTime(gain * 0.45, safeTime);
+      env.gain.linearRampToValueAtTime(0, safeTime + 0.032);
 
       src.connect(filter);
       filter.connect(env);
       env.connect(destination);
-      src.start(time);
-      src.stop(time + 0.04);
+      src.start(safeTime);
+      src.stop(safeTime + 0.04);
     }
   }
 
@@ -717,7 +810,6 @@ class TabletopAudioManager {
   // 11 SFX Tabletop — Warm, Playful, Non-Harsh
   // ============================================================================
 
-  /** Klik kayu/tactile halus untuk tombol utama */
   public playUiClick(): void {
     void this.ensureUnlocked().then((ok) => {
       if (!ok || !this.canPlaySfx() || !this.ctx || !this.sfxGain) return;
@@ -725,7 +817,6 @@ class TabletopAudioManager {
     });
   }
 
-  /** Chime 2 nada ceria saat pop-up giliran muncul */
   public playTurnStart(isMyTurn: boolean): void {
     if (!this.canPlaySfx() || !this.ctx || !this.sfxGain) return;
     const now = this.ctx.currentTime;
@@ -773,7 +864,6 @@ class TabletopAudioManager {
     }
   }
 
-  /** Suara kocokan dadu kayu berirama selama animasi lempar dadu (~0.8 detik) */
   public playDiceRoll(durationMs = 800): void {
     if (!this.canPlaySfx() || !this.ctx || !this.sfxGain) return;
     const now = this.ctx.currentTime;
@@ -788,7 +878,6 @@ class TabletopAudioManager {
     });
   }
 
-  /** Bunyi "tok/hop" bidak kayu tiap langkah dengan variasi pitch naik */
   public playPawnStep(stepIndex = 0): void {
     if (!this.canPlaySfx() || !this.ctx || !this.sfxGain) return;
     const now = this.ctx.currentTime;
@@ -808,7 +897,6 @@ class TabletopAudioManager {
     });
   }
 
-  /** Arpeggio harp/marimba naik yang riang saat naik tangga */
   public playLadderClimb(): void {
     if (!this.canPlaySfx() || !this.ctx || !this.sfxGain) return;
     const now = this.ctx.currentTime;
@@ -835,7 +923,6 @@ class TabletopAudioManager {
     });
   }
 
-  /** Efek seluncuran turun yang jenaka saat tergigit ular */
   public playSnakeSlide(): void {
     if (!this.canPlaySfx() || !this.ctx || !this.sfxGain) return;
     const now = this.ctx.currentTime;
@@ -847,7 +934,7 @@ class TabletopAudioManager {
 
     osc.type = 'triangle';
     osc.frequency.setValueAtTime(660, now);
-    osc.frequency.exponentialRampToValueAtTime(190, now + 0.52);
+    osc.frequency.linearRampToValueAtTime(190, now + 0.52);
 
     lfo.type = 'sine';
     lfo.frequency.value = 11;
@@ -855,9 +942,9 @@ class TabletopAudioManager {
     lfo.connect(lfoGain);
     lfoGain.connect(osc.frequency);
 
-    env.gain.setValueAtTime(0.0001, now);
+    env.gain.setValueAtTime(0, now);
     env.gain.linearRampToValueAtTime(0.24, now + 0.03);
-    env.gain.exponentialRampToValueAtTime(0.0001, now + 0.56);
+    env.gain.linearRampToValueAtTime(0, now + 0.56);
 
     osc.connect(env);
     env.connect(this.sfxGain);
@@ -870,7 +957,6 @@ class TabletopAudioManager {
     this.playWoodTap(this.sfxGain, now + 0.5, 240, 0.22);
   }
 
-  /** Jingle pendek penuh semangat saat mendarat di petak QUESTION */
   public playQuizOpen(): void {
     if (!this.canPlaySfx() || !this.ctx || !this.sfxGain) return;
     const now = this.ctx.currentTime;
@@ -888,14 +974,12 @@ class TabletopAudioManager {
     });
   }
 
-  /** Detak kayu halus pada 5 detik terakhir countdown kuis */
   public playQuizTick(secondsLeft: number): void {
     if (!this.canPlaySfx() || !this.ctx || !this.sfxGain) return;
     const freq = secondsLeft <= 2 ? 1_180 : 940;
     this.playWoodTap(this.sfxGain, this.ctx.currentTime, freq, 0.16);
   }
 
-  /** Fanfare chord mayor memuaskan saat jawaban kuis BENAR */
   public playQuizCorrect(): void {
     void this.ensureUnlocked().then((ok) => {
       if (!ok || !this.canPlaySfx() || !this.ctx || !this.sfxGain) return;
@@ -926,7 +1010,6 @@ class TabletopAudioManager {
     });
   }
 
-  /** Nada turun lembut (comical gentle buzz, nyaman di telinga) saat SALAH/timeout */
   public playQuizWrong(): void {
     if (!this.canPlaySfx() || !this.ctx || !this.sfxGain) return;
     const now = this.ctx.currentTime;
@@ -951,7 +1034,6 @@ class TabletopAudioManager {
     });
   }
 
-  /** Fanfare kemenangan meriah saat layar GAME_OVER muncul */
   public playGameOver(): void {
     if (!this.canPlaySfx() || !this.ctx || !this.sfxGain) return;
     const now = this.ctx.currentTime;

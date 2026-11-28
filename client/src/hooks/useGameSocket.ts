@@ -69,6 +69,7 @@ export function useGameSocket(hookOptions: UseGameSocketOptions = {}) {
   const phase = useGameStore((s) => s.phase);
   const room = useGameStore((s) => s.room);
   const board = useGameStore((s) => s.board);
+  const boardSeed = useGameStore((s) => s.boardSeed);
   const turnOrder = useGameStore((s) => s.turnOrder);
   const positions = useGameStore((s) => s.positions);
   const currentTurn = useGameStore((s) => s.currentTurn);
@@ -282,6 +283,7 @@ export function useGameSocket(hookOptions: UseGameSocketOptions = {}) {
     phase,
     room,
     board,
+    boardSeed,
     turnOrder,
     positions,
     currentTurn,

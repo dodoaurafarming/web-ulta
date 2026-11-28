@@ -21,7 +21,39 @@ export function AudioControlPopover({
     audioManager.getSnapshot,
   );
   const [open, setOpen] = useState(false);
+  const [bgmMeter, setBgmMeter] = useState({
+    rms: 0,
+    peak: 0,
+    maxRms: 0,
+    scheduledNotes: 0,
+  });
   const containerRef = useRef<HTMLDivElement | null>(null);
+
+  // Sampel level nyata dari AnalyserNode saat BGM/AudioContext aktif
+  useEffect(() => {
+    if (!audio.bgmPlaying && !open) {
+      setBgmMeter((prev) =>
+        prev.rms === 0 && prev.peak === 0
+          ? prev
+          : { ...prev, rms: 0, peak: 0 },
+      );
+      return;
+    }
+
+    const poll = () => {
+      const diag = audioManager.getBgmDiagnostics();
+      setBgmMeter((prev) => ({
+        rms: diag.rms,
+        peak: diag.peak,
+        maxRms: Math.max(prev.maxRms, diag.rms),
+        scheduledNotes: diag.scheduledNotes,
+      }));
+    };
+
+    poll();
+    const timer = window.setInterval(poll, 160);
+    return () => window.clearInterval(timer);
+  }, [audio.bgmPlaying, open]);
 
   useEffect(() => {
     if (!open) return;
@@ -55,9 +87,7 @@ export function AudioControlPopover({
         ? audio.bgmDucked
           ? 'Aktif (mode kuis)'
           : 'Aktif (110 BPM)'
-        : audio.bgmWanted
-          ? 'Menunggu klik'
-          : 'Siaga (Lobby/Arena)';
+        : 'Menunggu klik pertama';
 
   return (
     <div ref={containerRef} className="relative flex items-center gap-1">
@@ -79,6 +109,11 @@ export function AudioControlPopover({
         }
         aria-label={isEffectivelyMuted ? 'Aktifkan suara' : 'Bisukan semua suara'}
         data-bgm-playing={audio.bgmPlaying ? 'true' : 'false'}
+        data-bgm-rms={bgmMeter.rms.toFixed(4)}
+        data-bgm-peak={bgmMeter.peak.toFixed(4)}
+        data-bgm-max-rms={bgmMeter.maxRms.toFixed(4)}
+        data-bgm-notes={String(bgmMeter.scheduledNotes)}
+        data-audio-ctx={audio.contextState}
         className={`btn-tactile relative inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-xs font-semibold cursor-pointer ${
           isEffectivelyMuted
             ? 'border-[#E7B5A9] bg-[#FCEBE7] text-[#8F2F1E]'
@@ -191,6 +226,31 @@ export function AudioControlPopover({
                 {Math.round(audio.bgmVolume * 100)}%
               </span>
             </div>
+            {/* Indikator sinyal BGM nyata dari AnalyserNode */}
+            <div className="flex items-center justify-between gap-2 pt-0.5">
+              <div
+                aria-hidden="true"
+                className="flex h-2.5 flex-1 items-end gap-0.5 overflow-hidden rounded bg-[#EFE6D6] px-1 py-0.5"
+              >
+                {[0.18, 0.32, 0.48, 0.65, 0.82, 1.0].map((threshold, idx) => {
+                  const normalized = Math.min(1, bgmMeter.peak * 4.5);
+                  const active = audio.bgmPlaying && normalized >= threshold * 0.4;
+                  return (
+                    <span
+                      key={idx}
+                      className={`h-full flex-1 rounded-xs transition-colors ${
+                        active ? 'bg-[#266D4B]' : 'bg-[#D5C7B2]/60'
+                      }`}
+                    />
+                  );
+                })}
+              </div>
+              <span className="font-code text-[10px] font-semibold text-[#605549]">
+                {audio.bgmPlaying
+                  ? `RMS ${bgmMeter.rms.toFixed(3)}`
+                  : 'Siaga'}
+              </span>
+            </div>
           </div>
 
           {/* Kontrol SFX */}
@@ -238,14 +298,25 @@ export function AudioControlPopover({
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => audioManager.playQuizCorrect()}
-            disabled={isEffectivelyMuted || !audio.sfxEnabled}
-            className="btn-tactile w-full rounded-lg border border-[#D5C7B2] bg-[#EFE6D6] py-1.5 text-xs font-bold text-[#1F1A15] hover:bg-[#E5DAC7] cursor-pointer disabled:opacity-45 disabled:cursor-not-allowed"
-          >
-            Tes efek suara
-          </button>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => void audioManager.playBgmPreview()}
+              className="btn-tactile inline-flex items-center justify-center gap-1 rounded-lg border border-[#BBDAC8] bg-[#E6F2EB] py-1.5 text-xs font-bold text-[#1D5439] hover:bg-[#D5EAD9] cursor-pointer"
+            >
+              <Music className="h-3.5 w-3.5" />
+              <span>Tes Musik</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => audioManager.playQuizCorrect()}
+              disabled={isEffectivelyMuted || !audio.sfxEnabled}
+              className="btn-tactile inline-flex items-center justify-center gap-1 rounded-lg border border-[#D5C7B2] bg-[#EFE6D6] py-1.5 text-xs font-bold text-[#1F1A15] hover:bg-[#E5DAC7] cursor-pointer disabled:opacity-45 disabled:cursor-not-allowed"
+            >
+              <Sparkles className="h-3.5 w-3.5 text-[#C44B34]" />
+              <span>Tes SFX</span>
+            </button>
+          </div>
         </div>
       )}
     </div>

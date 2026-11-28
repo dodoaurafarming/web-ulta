@@ -7,7 +7,7 @@ import { usePresentationQueue } from './hooks/usePresentationQueue';
 import { GameArenaPage } from './pages/GameArenaPage';
 import { GameOverPage } from './pages/GameOverPage';
 import { LandingPage } from './pages/LandingPage';
-import { LeaderboardPlaceholder } from './pages/LeaderboardPlaceholder';
+import { LeaderboardPage } from './pages/LeaderboardPage';
 import { LobbyPage } from './pages/LobbyPage';
 import { audioManager } from './services/audioManager';
 
@@ -129,15 +129,28 @@ export default function App() {
     activeView === 'game' &&
     (game.phase === 'playing' || (game.phase === 'gameover' && !showGameOver));
 
-  // Putar BGM hangat secara otomatis di Lobby & Arena, hentikan di Landing/Game Over
+  // BGM hangat selalu siap & langsung berputar halus sejak interaksi klik pertama
+  // pengguna (Landing, Lobby, Arena, Leaderboard), hanya diredupkan saat kuis/fanfare.
   useEffect(() => {
-    const shouldPlayBgm =
-      activeView === 'game' && (game.phase === 'lobby' || isArenaViewport);
-    audioManager.setBgmActive(shouldPlayBgm);
+    audioManager.setBgmActive(true);
     return () => {
       audioManager.setBgmActive(false);
     };
-  }, [activeView, game.phase, isArenaViewport]);
+  }, []);
+
+  useEffect(() => {
+    if (showGameOver) {
+      audioManager.setDucked(true);
+      const id = window.setTimeout(() => {
+        audioManager.setDucked(false);
+      }, 2200);
+      return () => {
+        window.clearTimeout(id);
+        audioManager.setDucked(false);
+      };
+    }
+    return undefined;
+  }, [showGameOver]);
 
   const canRoll = Boolean(
     game.phase === 'playing' &&
@@ -184,7 +197,10 @@ export default function App() {
         }
       >
         {activeView === 'leaderboard' ? (
-          <LeaderboardPlaceholder onBackToGame={() => setActiveView('game')} />
+          <LeaderboardPage
+            mockMode={game.mockMode}
+            onBackToGame={() => setActiveView('game')}
+          />
         ) : game.phase === 'lobby' && game.room ? (
           <LobbyPage
             room={game.room}
@@ -226,7 +242,9 @@ export default function App() {
             gameOver={presentation.presentedGameOver}
             room={game.room}
             myPlayerId={game.playerId}
+            boardSeed={game.boardSeed}
             startedAt={game.startedAt}
+            mockMode={game.mockMode}
             quizStatsByPlayer={game.quizStatsByPlayer}
             onReturnHome={handleReturnHome}
             onOpenLeaderboard={() => setActiveView('leaderboard')}

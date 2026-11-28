@@ -1,3 +1,10 @@
+export type DataSourceMode = 'api' | 'local';
+
+export type LocalFallbackReason =
+  | 'mock-mode'
+  | 'not-configured'
+  | 'api-unreachable';
+
 export interface LeaderboardEntry {
   rank: number;
   id: number;
@@ -8,6 +15,7 @@ export interface LeaderboardEntry {
   questionsAnswered: number;
   questionsCorrect: number;
   quizAccuracy: number;
+  averagePosition: number;
   lastPlayedAt: string | null;
 }
 
@@ -48,4 +56,29 @@ export interface SaveMatchPayload {
     questionsAnswered?: number;
     questionsCorrect?: number;
   }>;
+}
+
+export interface LeaderboardResponse {
+  items: LeaderboardEntry[];
+  total: number;
+  source: DataSourceMode;
+  fallbackReason?: LocalFallbackReason;
+  errorMessage?: string;
+}
+
+export interface MatchHistoryResponse {
+  items: MatchHistoryRecord[];
+  total: number;
+  source: DataSourceMode;
+  fallbackReason?: LocalFallbackReason;
+  errorMessage?: string;
+}
+
+export interface SaveMatchResultResponse {
+  ok: boolean;
+  source: DataSourceMode;
+  deduplicated: boolean;
+  savedLocally: boolean;
+  match?: MatchHistoryRecord;
+  errorMessage?: string;
 }

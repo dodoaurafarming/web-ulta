@@ -1,6 +1,8 @@
 import 'dotenv/config';
 
-const rawCorsOrigin = process.env.CORS_ORIGIN ?? 'http://localhost:5173';
+const rawCorsOrigin =
+  process.env.CORS_ORIGIN ??
+  'http://localhost:5173,http://127.0.0.1:5173,https://web-ulta.vercel.app';
 
 export const env = {
   port: Number(process.env.PORT ?? 4000),

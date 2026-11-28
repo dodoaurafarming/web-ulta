@@ -63,6 +63,7 @@ export interface GameStoreState {
   phase: GamePhase;
   room: RoomStateData | null;
   board: BoardCell[];
+  boardSeed: number | null;
   turnOrder: string[];
   positions: Record<string, number>;
   currentTurn: ActiveTurnState | null;
@@ -235,6 +236,7 @@ export function createInitialGameState(): GameStoreState {
     phase: 'landing',
     room: null,
     board: [],
+    boardSeed: null,
     turnOrder: [],
     positions: {},
     currentTurn: null,
@@ -378,6 +380,7 @@ export function reduceServerEvent(
         phase: 'playing',
         room: updatedRoom,
         board: event.board,
+        boardSeed: typeof event.seed === 'number' ? event.seed : null,
         turnOrder: event.turnOrder,
         positions,
         currentTurn: null,
@@ -574,6 +577,7 @@ export function reduceServerEvent(
           room: null,
           requestedMaxPlayers: null,
           board: [],
+          boardSeed: null,
           turnOrder: [],
           positions: {},
           currentTurn: null,
@@ -739,6 +743,7 @@ export const useGameStore = create<GameStore>((set) => ({
       room: null,
       requestedMaxPlayers: null,
       board: [],
+      boardSeed: null,
       turnOrder: [],
       positions: {},
       currentTurn: null,

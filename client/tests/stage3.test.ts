@@ -226,6 +226,7 @@ test('reduceServerEvent: alur penuh game state, inferensi penonton, dan toast er
     order: ['p1', 'p2'],
   });
   assert.equal(state.phase, 'playing');
+  assert.equal(state.boardSeed, null);
   assert.equal(state.board.length, 100);
   assert.equal(state.positions.p1, 1);
   assert.equal(state.positions.p2, 1);
@@ -538,6 +539,7 @@ test('Kontrak asli server.py + game.py + board.py: 101-el board, active_player_i
     turn_order: ['p_aaaa', 'p_bbbb'],
   });
   assert.equal(state.phase, 'playing');
+  assert.equal(state.boardSeed, 17);
   assert.equal(state.board.length, 100);
   // Verifikasi indeks 1-based TIDAK bergeser oleh board[0] = null!
   assert.equal(state.board[0].index, 1);

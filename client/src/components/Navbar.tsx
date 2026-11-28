@@ -79,7 +79,7 @@ export function Navbar({
         }`}
       >
         {/* Brand */}
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="flex shrink-0 items-center gap-2">
           <button
             type="button"
             onClick={() => onChangeView('game')}
@@ -98,14 +98,18 @@ export function Navbar({
           </button>
 
           {roomCode && (
-            <span className="rounded-md border border-[#E5C068] bg-[#FDF3D7] px-2 py-0.5 font-code text-[11px] font-bold text-[#7D530B]">
+            <span
+              className={`${
+                compactArena ? 'inline-flex' : 'hidden sm:inline-flex'
+              } rounded-md border border-[#E5C068] bg-[#FDF3D7] px-2 py-0.5 font-code text-[11px] font-bold text-[#7D530B]`}
+            >
               {roomCode}
             </span>
           )}
         </div>
 
         {/* Right Controls */}
-        <div className="flex items-center gap-1.5 sm:gap-2">
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
           {/* Switch Live WS / Mock (disembunyikan di mobile arena agar top bar super ringkas) */}
           <div
             className={`${
@@ -123,6 +127,7 @@ export function Navbar({
                   : 'text-[#605549] hover:text-[#1F1A15]'
               }`}
               title="WebSocket Bridge VPS"
+              aria-label="Mode WebSocket Asli"
             >
               <Wifi className="h-3.5 w-3.5" />
               <span className="hidden sm:inline">Live WS</span>
@@ -136,9 +141,10 @@ export function Navbar({
                   : 'text-[#605549] hover:text-[#1F1A15]'
               }`}
               title="Simulasi lokal ULTA/1.0"
+              aria-label="Mode Simulasi Mock"
             >
               <FlaskConical className="h-3.5 w-3.5" />
-              <span>Mock</span>
+              <span className="hidden sm:inline">Mock</span>
             </button>
           </div>
 
@@ -197,9 +203,13 @@ export function Navbar({
             onClick={() =>
               onChangeView(activeView === 'game' ? 'leaderboard' : 'game')
             }
+            title={activeView === 'leaderboard' ? 'Kembali ke Game' : 'Leaderboard'}
+            aria-label={
+              activeView === 'leaderboard' ? 'Kembali ke Game' : 'Leaderboard'
+            }
             className={`btn-tactile ${
               compactArena ? 'hidden sm:inline-flex' : 'inline-flex'
-            } items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-bold cursor-pointer ${
+            } items-center gap-1.5 rounded-lg border px-2 sm:px-2.5 py-1 text-xs font-bold cursor-pointer ${
               activeView === 'leaderboard'
                 ? 'border-[#1F1A15] bg-[#1F1A15] text-[#FFFDF8]'
                 : 'border-[#D5C7B2] bg-[#FFFDF8] text-[#1F1A15] hover:bg-[#EFE6D6]'
@@ -208,7 +218,7 @@ export function Navbar({
             {activeView === 'leaderboard' ? (
               <>
                 <Gamepad2 className="h-3.5 w-3.5" />
-                <span>Kembali ke Game</span>
+                <span className="hidden sm:inline">Kembali ke Game</span>
               </>
             ) : (
               <>
